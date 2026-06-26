@@ -18,6 +18,7 @@ export default async function AppLayout({
   const { data: cu } = await supabase
     .from("company_users")
     .select("company_id")
+    .eq("user_id", user.id)
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();

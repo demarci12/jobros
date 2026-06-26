@@ -52,22 +52,27 @@ export async function completeOnboarding(formData: FormData) {
   const trialEndsAt = new Date();
   trialEndsAt.setDate(trialEndsAt.getDate() + 14);
 
-  const [cuResult, subResult] = await Promise.all([
-    service.from("company_users").insert({
-      company_id: company.id,
-      user_id: user.id,
-      role: "owner",
-      is_active: true,
-    }),
-    service.from("subscriptions").insert({
-      company_id: company.id,
-      plan_slug: "trial",
-      status: "trialing",
-      trial_ends_at: trialEndsAt.toISOString(),
-    }),
-  ]);
+  const cuResult = await service.from("company_users").insert({
+    company_id: company.id,
+    user_id: user.id,
+    role: "owner",
+    is_active: true,
+  });
 
-  if (cuResult.error || subResult.error) {
+  if (cuResult.error) {
+    await service.from("companies").delete().eq("id", company.id);
+    return { error: "Regisztráció sikertelen. Próbálja újra." };
+  }
+
+  const subResult = await service.from("subscriptions").insert({
+    company_id: company.id,
+    plan_slug: "trial",
+    status: "trialing",
+    trial_ends_at: trialEndsAt.toISOString(),
+  });
+
+  if (subResult.error) {
+    // company ON DELETE CASCADE törli a company_users sort is
     await service.from("companies").delete().eq("id", company.id);
     return { error: "Regisztráció sikertelen. Próbálja újra." };
   }
