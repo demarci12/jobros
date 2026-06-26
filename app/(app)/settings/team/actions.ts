@@ -49,7 +49,7 @@ export async function inviteMember(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
-  return { success: true, token };
+  return { success: true };
 }
 
 export async function changeRole(formData: FormData) {

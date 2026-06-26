@@ -3,7 +3,6 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { signInWithMagicLink } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -32,15 +31,13 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const fd = new FormData();
-    fd.set("email", email);
-    const result = await signInWithMagicLink(fd);
+    const { error: otpError } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${siteUrl}/auth/callback` },
+    });
     setLoading(false);
-    if (result?.error) {
-      setError(result.error);
-    } else {
-      setSent(true);
-    }
+    if (otpError) setError(otpError.message);
+    else setSent(true);
   }
 
   return (

@@ -93,6 +93,46 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 
 ---
 
+## signInWithOtp NE Server Actionből hívd — PKCE cookie elvész
+
+`lib/auth.ts`-ben `signInWithOtp` Server Actionből lett meghívva (`"use server"`). A `@supabase/ssr` PKCE `code_verifier` cookie-t generál, de Next.js 14 SA response pipeline nem garantáltan juttatja el a böngészőhöz. Callback-nél a verifier hiányzik → `exchangeCodeForSession` hibát dob. Magic link OTP-t mindig a **browser kliens** (`createClient()` from `lib/supabase/client`) hívjon közvetlenül a Client Componentből.
+
+**Why:** Első megtalálva auth+settings PR review-ban 2026-06-26.
+
+**How to apply:** Flag as BLOKKOLÓ ha `supabase.auth.signInWithOtp` vagy `supabase.auth.signInWithOAuth` Server Actionből van meghívva.
+
+---
+
+## `/accept-invite` MINDIG szerepeljen a middleware PUBLIC_PATHS-ban
+
+`middleware.ts` `PUBLIC_PATHS` tömbéből hiányzott `/accept-invite`. Bejelentkezetlen meghívott user nem tudja elérni a meghívó oldalt.
+
+**Why:** Első megtalálva 2026-06-26 auth review-ban.
+
+**How to apply:** Flag as BLOKKOLÓ ha új publikus route (accept-invite, email-verify, password-reset, stb.) kerül `app/(auth)/`-ba anélkül, hogy a middleware `isPublic()` függvénye lefedi.
+
+---
+
+## auth/callback `next` param figyelmen kívül marad `!company_user` esetén
+
+`app/auth/callback/route.ts` ha a felhasználónak nincs `company_users` sora, mindig `/onboarding`-ra dob vissza — az explicit `next` paramétert elveti. Ez eltöri az accept-invite flow-t: a new user soha nem éri el `/accept-invite/[token]`-t. Ha `next` nem az alapértelmezett `/dashboard`, a `!cu` ágban is a `next` útvonalra kell irányítani.
+
+**Why:** Első megtalálva 2026-06-26 auth review-ban.
+
+**How to apply:** Flag as BLOKKOLÓ minden olyan callback-logikánál ahol `!company_user` ág felülírja az explicit `next` paramétert.
+
+---
+
+## Nyers meghívó token ne kerüljön vissza a Server Action válaszba
+
+`settings/team/actions.ts inviteMember` `{ success: true, token }` formában adta vissza a tokent a kliensnek. A token csak emailben kell, a kliensnek nem. Bármely XSS vagy hálózatfigyelő kiolvashatja.
+
+**Why:** Első megtalálva 2026-06-26 team actions review-ban.
+
+**How to apply:** Flag as "javasolt/biztonsági" — a token mező maradjon ki a SA visszatérési értékéből.
+
+---
+
 ## ConfirmDelete dialog can be dismissed via ESC/backdrop while loading
 
 `components/common/ConfirmDelete.tsx` passes `onOpenChange` directly to `<Dialog>` without guarding against close events while `loading=true`. This means the dialog can be ESC-closed mid-operation, leaving the delete in flight with no UI feedback.

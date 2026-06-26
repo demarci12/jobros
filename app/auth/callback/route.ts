@@ -43,7 +43,9 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (!cu) {
-    return NextResponse.redirect(`${origin}/onboarding`);
+    // Preserve next param — accept-invite sets it so the invite flow completes after login
+    const dest = next !== "/dashboard" ? next : "/onboarding";
+    return NextResponse.redirect(`${origin}${dest}`);
   }
 
   return NextResponse.redirect(`${origin}${next}`);

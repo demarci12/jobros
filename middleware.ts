@@ -5,7 +5,9 @@ const PUBLIC_PATHS = ["/", "/login", "/register", "/auth/callback"];
 
 function isPublic(pathname: string) {
   return (
-    PUBLIC_PATHS.includes(pathname) || pathname.startsWith("/public/")
+    PUBLIC_PATHS.includes(pathname) ||
+    pathname.startsWith("/public/") ||
+    pathname.startsWith("/accept-invite/")
   );
 }
 
