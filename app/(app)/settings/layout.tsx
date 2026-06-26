@@ -8,6 +8,7 @@ const settingsNav = [
   { href: "/settings/account",      label: "Fiók" },
   { href: "/settings/company",      label: "Cégadatok" },
   { href: "/settings/team",         label: "Csapat" },
+  { href: "/settings/services",     label: "Szolgáltatások" },
   { href: "/settings/subscription", label: "Előfizetés" },
 ] as const;
 
