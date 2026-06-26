@@ -1,0 +1,1 @@
+- [T-01 RLS baseline](project_rls_baseline.md) — Supabase kliens architektúra audit (service_role guard, cookie kezelés, hiányzó server-only csomag)
