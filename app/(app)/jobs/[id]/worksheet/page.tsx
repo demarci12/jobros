@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { WorksheetClient } from "@/components/worksheet/WorksheetClient";
+import { SignaturePad } from "@/components/worksheet/SignaturePad";
+import { PhotoUpload } from "@/components/worksheet/PhotoUpload";
 
 export default async function WorksheetPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -12,7 +14,6 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
   if (!cu) redirect("/onboarding");
 
-  // verify job belongs to company
   const { data: job } = await supabase
     .from("jobs").select("id, assigned_to")
     .eq("id", params.id).eq("company_id", cu.company_id).maybeSingle();
@@ -20,12 +21,18 @@ export default async function WorksheetPage({ params }: { params: { id: string }
 
   const canEdit = ["owner", "dispatcher"].includes(cu.role) || job.assigned_to === user.id;
 
-  const { data: worksheet } = await supabase
-    .from("worksheets")
-    .select("id, work_done, labor_hours")
-    .eq("job_id", params.id)
-    .eq("company_id", cu.company_id)
-    .maybeSingle();
+  const [
+    { data: worksheet },
+    { data: signatures },
+    { data: attachments },
+  ] = await Promise.all([
+    supabase.from("worksheets").select("id, work_done, labor_hours")
+      .eq("job_id", params.id).eq("company_id", cu.company_id).maybeSingle(),
+    supabase.from("signatures").select("id, signer_role, signer_name, image_url, signed_at")
+      .eq("job_id", params.id).order("signed_at"),
+    supabase.from("attachments").select("id, storage_path, caption")
+      .eq("job_id", params.id).eq("kind", "photo").order("created_at"),
+  ]);
 
   const { data: lines } = worksheet
     ? await supabase
@@ -36,15 +43,48 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     : { data: null };
 
   return (
-    <WorksheetClient
-      jobId={params.id}
-      worksheet={{
-        id: worksheet?.id ?? null,
-        work_done: worksheet?.work_done ?? null,
-        labor_hours: worksheet?.labor_hours ?? null,
-        lines: (lines ?? []) as any,
-      }}
-      canEdit={canEdit}
-    />
+    <div className="space-y-8 max-w-2xl">
+      <WorksheetClient
+        jobId={params.id}
+        worksheet={{
+          id: worksheet?.id ?? null,
+          work_done: worksheet?.work_done ?? null,
+          labor_hours: worksheet?.labor_hours ?? null,
+          lines: (lines ?? []) as any,
+        }}
+        canEdit={canEdit}
+      />
+
+      {/* Fotók */}
+      {canEdit && (
+        <div className="space-y-2">
+          <h2 className="font-semibold text-sm">Fotók</h2>
+          <PhotoUpload
+            jobId={params.id}
+            initialAttachments={(attachments ?? []) as any}
+          />
+        </div>
+      )}
+
+      {/* Aláírás */}
+      {canEdit && (
+        <div className="space-y-2">
+          <h2 className="font-semibold text-sm">Aláírás</h2>
+          {(signatures ?? []).length > 0 && (
+            <div className="flex gap-3 flex-wrap">
+              {(signatures ?? []).map((s: any) => (
+                <div key={s.id} className="text-center">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={s.image_url} alt={`${s.signer_name ?? s.signer_role} aláírása`}
+                    className="w-40 h-20 object-contain border rounded bg-white" />
+                  <p className="text-xs text-muted-foreground mt-1">{s.signer_name ?? s.signer_role}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <SignaturePad jobId={params.id} />
+        </div>
+      )}
+    </div>
   );
 }
