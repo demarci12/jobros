@@ -113,6 +113,22 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 
 ---
 
+## auth/callback: `page.tsx` MINDIG explicit `exchangeCodeForSession` + `setSession` — NE `onAuthStateChange`-t várj
+
+`@supabase/ssr` v0.5+ `createBrowserClient` alapértelmezetten PKCE módban fut. PKCE módban a kliens **szilentül figyelmen kívül hagyja** a `#access_token` hash fragmenteket. Adminisztrátor által generált linkek és varázs-linkek implicit flow-t használnak (hash token) → `getSession()` null-t ad, `onAuthStateChange` soha nem tüzel.
+
+**Helyes pattern (app/auth/callback/page.tsx):**
+1. `?code=` query param → `supabase.auth.exchangeCodeForSession(code)` (PKCE)
+2. `#access_token=` hash fragment → `supabase.auth.setSession({ access_token, refresh_token })` (implicit/admin)
+3. Egyéb → `supabase.auth.getSession()` (már meglévő session, OTP upstream)
+4. Minden ágban sikeres session után: `upsertProfileAndRedirect(session.user.id, safeNext)` szerver action hívása — nincs DB trigger `auth.users`-ra.
+
+**Why:** PKCE és implicit flow eltérő mechanizmussal szállítja a tokent. A `@supabase/ssr` kliens nem konvertálja automatikusan. Ráadásul nincs `auth.users` insert trigger a migrációkban, a profile row-t explicitly kell létrehozni.
+
+**How to apply:** Flag as BLOKKOLÓ ha a callback oldal csak `getSession()` + `onAuthStateChange`-re épül, és nem kezeli külön a `?code=` és `#access_token` eseteket.
+
+---
+
 ## auth/callback `next` param figyelmen kívül marad `!company_user` esetén
 
 `app/auth/callback/route.ts` ha a felhasználónak nincs `company_users` sora, mindig `/onboarding`-ra dob vissza — az explicit `next` paramétert elveti. Ez eltöri az accept-invite flow-t: a new user soha nem éri el `/accept-invite/[token]`-t. Ha `next` nem az alapértelmezett `/dashboard`, a `!cu` ágban is a `next` útvonalra kell irányítani.
