@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 export const navItems = [
-  { href: "/intake", label: "Intake", icon: Phone },
+  { href: "/intake", label: "Telefon-intake", icon: Phone },
   { href: "/dashboard", label: "Irányítópult", icon: LayoutDashboard },
   { href: "/customers", label: "Ügyfelek", icon: Users },
   { href: "/jobs", label: "Munkák", icon: Briefcase },

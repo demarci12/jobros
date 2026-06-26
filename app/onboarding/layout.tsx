@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { AppShell } from "@/components/shell/app-shell";
 
-export default async function AppLayout({
+export default async function OnboardingLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -22,11 +20,11 @@ export default async function AppLayout({
     .limit(1)
     .maybeSingle();
 
-  if (!cu) redirect("/onboarding");
+  if (cu) redirect("/dashboard");
 
   return (
-    <TooltipProvider>
-      <AppShell>{children}</AppShell>
-    </TooltipProvider>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {children}
+    </div>
   );
 }

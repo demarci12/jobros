@@ -7,7 +7,8 @@ import { navItems, settingsItem } from "./nav-items";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
+import { signOut } from "@/lib/auth";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -48,8 +49,21 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      <div className="border-t py-2 px-2 shrink-0">
+      <div className="border-t py-2 px-2 shrink-0 space-y-0.5">
         <NavLink item={settingsItem} collapsed={collapsed} pathname={pathname} />
+        <form action={signOut}>
+          <button
+            type="submit"
+            className={cn(
+              "w-full flex items-center gap-3 rounded-md px-2 py-2 text-sm font-medium transition-colors",
+              "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              collapsed && "justify-center px-0"
+            )}
+          >
+            <LogOut size={18} className="shrink-0" />
+            {!collapsed && <span>Kijelentkezés</span>}
+          </button>
+        </form>
       </div>
     </aside>
   );
