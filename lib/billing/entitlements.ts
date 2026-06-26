@@ -67,12 +67,13 @@ export async function checkEntitlement(
   if (key === "technicians") {
     if (plan.max_technicians === null) return { allowed: true };
 
+    // owner + dispatcher + technician mind helyet foglal (accountant nem operatív)
     const { count } = await service
       .from("company_users")
       .select("user_id", { count: "exact", head: true })
       .eq("company_id", companyId)
       .eq("is_active", true)
-      .in("role", ["technician", "dispatcher"]);
+      .neq("role", "accountant");
 
     const current = count ?? 0;
     if (current >= plan.max_technicians) {
@@ -81,9 +82,9 @@ export async function checkEntitlement(
     return { allowed: true };
   }
 
-  // Feature-gate ellenőrzés
+  // Feature-gate: hiányzó kulcs = tiltott (fail-closed)
   const features = plan.features ?? {};
-  if (features[key] === false) {
+  if (features[key] !== true) {
     return { allowed: false, reason: "feature_gate" };
   }
 

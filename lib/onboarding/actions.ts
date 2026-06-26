@@ -18,7 +18,8 @@ export async function completeOnboarding(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  // redirect() throws a special Next.js error — return instead so startTransition callers handle it
+  if (!user) return { error: "Nincs bejelentkezve." };
 
   const parsed = onboardingSchema.safeParse({
     name: formData.get("name"),

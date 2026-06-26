@@ -15,6 +15,7 @@ interface ConfirmDeleteProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
+  confirmLabel?: string;
   onConfirm: () => void;
   loading?: boolean;
 }
@@ -24,6 +25,7 @@ export function ConfirmDelete({
   onOpenChange,
   title = "Biztosan törlöd?",
   description = "Ez a művelet nem vonható vissza azonnal, de a törlés visszavonható.",
+  confirmLabel = "Törlés",
   onConfirm,
   loading,
 }: ConfirmDeleteProps) {
@@ -39,7 +41,7 @@ export function ConfirmDelete({
             Mégsem
           </Button>
           <Button variant="destructive" onClick={onConfirm} disabled={loading}>
-            {loading ? "Törlés..." : "Törlés"}
+            {loading ? "…" : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>
