@@ -9,6 +9,7 @@ const settingsNav = [
   { href: "/settings/company",      label: "Cégadatok" },
   { href: "/settings/team",         label: "Csapat" },
   { href: "/settings/services",     label: "Szolgáltatások" },
+  { href: "/settings/zones",        label: "Zónák" },
   { href: "/settings/booking",      label: "Foglalás" },
   { href: "/settings/subscription", label: "Előfizetés" },
 ] as const;
