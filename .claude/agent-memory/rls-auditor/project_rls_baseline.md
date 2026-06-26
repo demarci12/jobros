@@ -41,6 +41,15 @@ T-01 inicializálás auditálva: 2026-06-26.
 - FIGYELEM: rendszerterv 9. szakasza nem tartalmazza a SET search_path = '' előírást — a migráció helyesen javított, de a tervet frissíteni kell.
 - FORCE ROW LEVEL SECURITY hiányzik — Supabase kontextusban elfogadható, de érdemes konvencióként rögzíteni.
 
+**T-08 audit (2026-06-26): Stripe Billing + webhook**
+
+- `lib/billing/stripe.ts`: `import "server-only"` — rendben.
+- `app/api/webhooks/stripe-billing/route.ts`: HMAC-validált event (`constructEvent`), service role-lal ír. A `company_id` a Stripe subscription.metadata-ból jön — ez manipulálható a HMAC-on kívül, de HMAC véd ellene. Azonban nincs ellenőrzés, hogy a `companyId` valóban létezik-e a `companies` táblában UPSERT előtt — csak `update().eq("company_id")` fut, ami csendesen üresen fut ha nincs ilyen sor. Ez nem RLS-veszély, de inkonzisztens állapotot okozhat.
+- `app/(app)/settings/subscription/actions.ts`: `getCompanyAndSub()` hitelesített user + company_users RLS alapján olvas `company_id`-t, majd service role-lal kérdezi le csak azt a céget. Tenant izoláció rendben — az RLS garantálja, hogy a company_users query csak a bejelentkezett user cégeinek company_id-jét adja vissza.
+- `resolveConnector` az `installed_apps` táblát service role-lal kérdezi, `company_id` szűrővel. Az `installed_apps` tábla nincs migrációban — 0001–0004 közül egyik sem tartalmazza. RLS-t még nem kapott, mert a tábla nem létezik. T-31 előtt ezt pótolni kell.
+- `subscriptions_select` policy: `has_role(company_id, ['owner'])` — csak owner olvashat, dispatcher/technician nem. Rendben.
+- `invoice.payment_succeeded`: a `companyId` extraction kettős fallback (metadata vagy subscription_details.metadata) — rendben, de ha mindkettő null, csendesen kihagyja.
+
 **Visszatérő kockázati pont a jövőben:**
 - Minden új kliens komponens (`'use client'`) létrehozásakor ellenőrizni kell, hogy nem importál-e `lib/supabase/service.ts`-t.
 - Minden új migrációban `company_id` szűrés + RLS engedélyezés kötelező.

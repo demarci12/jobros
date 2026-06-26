@@ -56,6 +56,13 @@ export async function POST(request: Request) {
       const companyId = sub.metadata?.company_id;
       if (!companyId) break;
 
+      // Defense-in-depth: verify companyId exists in our DB before writing
+      const { count: companyCount } = await service
+        .from("companies")
+        .select("id", { count: "exact", head: true })
+        .eq("id", companyId);
+      if (!companyCount) break;
+
       const priceId = sub.items.data[0]?.price.id;
       const planSlug = priceId ? await getPlanSlug(service, priceId) : null;
       const status = mapStatus(sub.status);
@@ -90,6 +97,12 @@ export async function POST(request: Request) {
       const sub = event.data.object as Stripe.Subscription;
       const companyId = sub.metadata?.company_id;
       if (!companyId) break;
+
+      const { count: delCompanyCount } = await service
+        .from("companies")
+        .select("id", { count: "exact", head: true })
+        .eq("id", companyId);
+      if (!delCompanyCount) break;
 
       await service
         .from("subscriptions")
