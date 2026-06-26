@@ -1,14 +1,13 @@
-import { EmptyState } from "@/components/common/EmptyState";
-import { Construction } from "lucide-react";
+import { QuickCustomerSearch } from "@/components/crm/QuickCustomerSearch";
 
-export default function ComingSoonPage() {
+export default function IntakePage() {
   return (
-    <div className="flex flex-1 items-center justify-center py-20">
-      <EmptyState
-        icon={Construction}
-        title="Hamarosan"
-        description="Ez a funkció fejlesztés alatt áll."
-      />
+    <div className="flex flex-col items-center gap-6 py-10 px-4">
+      <div className="text-center">
+        <h1 className="text-2xl font-semibold">Telefon-intake</h1>
+        <p className="text-muted-foreground mt-1 text-sm">Keress ügyfelet névvel vagy telefonszámmal</p>
+      </div>
+      <QuickCustomerSearch />
     </div>
   );
 }
