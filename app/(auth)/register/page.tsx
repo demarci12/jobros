@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,15 +10,19 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
-export default function RegisterPage() {
-  const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
+type Step = "email" | "otp";
 
+export default function RegisterPage() {
+  const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
+  const [step, setStep] = useState<Step>("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [oauthLoading, setOauthLoading] = useState<"google" | "apple" | null>(null);
 
   async function handleOAuth(provider: "google" | "apple") {
     setOauthLoading(provider);
@@ -27,88 +32,88 @@ export default function RegisterPage() {
     });
   }
 
-  async function handleMagicLink(e: React.FormEvent) {
+  async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    const { error: otpError } = await supabase.auth.signInWithOtp({
+    const { error } = await supabase.auth.signInWithOtp({
       email,
-      options: { emailRedirectTo: `${siteUrl}/auth/callback` },
+      options: { shouldCreateUser: true },
     });
     setLoading(false);
-    if (otpError) setError(otpError.message);
-    else setSent(true);
+    if (error) { setError(error.message); return; }
+    setStep("otp");
+  }
+
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: otp,
+      type: "email",
+    });
+    setLoading(false);
+    if (error) { setError(error.message); return; }
+    router.replace("/dashboard");
   }
 
   return (
     <Card className="w-full max-w-sm">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">Ingyenes regisztráció</CardTitle>
-        <CardDescription>14 napos próbaidőszak, kártyaszám nélkül</CardDescription>
+        <CardDescription>
+          {step === "email" ? "14 napos próbaidőszak, kártyaszám nélkül" : `Kód elküldve: ${email}`}
+        </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {sent ? (
-          <div className="text-center space-y-2 py-4">
-            <p className="font-medium">Ellenőrizze az e-mail fiókját!</p>
-            <p className="text-sm text-muted-foreground">
-              Regisztrációs linket küldtünk a(z) <strong>{email}</strong> címre.
-            </p>
-          </div>
-        ) : (
+        {step === "email" ? (
           <>
             <div className="space-y-2">
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleOAuth("google")}
-                disabled={!!oauthLoading}
-              >
+              <Button variant="outline" className="w-full" onClick={() => handleOAuth("google")} disabled={!!oauthLoading}>
                 {oauthLoading === "google" ? "Átirányítás…" : "Regisztráció Google-lel"}
               </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => handleOAuth("apple")}
-                disabled={!!oauthLoading}
-              >
+              <Button variant="outline" className="w-full" onClick={() => handleOAuth("apple")} disabled={!!oauthLoading}>
                 {oauthLoading === "apple" ? "Átirányítás…" : "Regisztráció Apple-lel"}
               </Button>
             </div>
-
             <div className="flex items-center gap-3">
               <Separator className="flex-1" />
               <span className="text-xs text-muted-foreground">vagy</span>
               <Separator className="flex-1" />
             </div>
-
-            <form onSubmit={handleMagicLink} className="space-y-3">
+            <form onSubmit={handleSendOtp} className="space-y-3">
               <div className="space-y-1">
                 <Label htmlFor="email">Munkahelyi e-mail cím</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="nev@ceg.hu"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                />
+                <Input id="email" type="email" placeholder="nev@ceg.hu" value={email}
+                  onChange={e => setEmail(e.target.value)} required autoComplete="email" />
               </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
+              {error && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Küldés…" : "Regisztrációs link küldése"}
+                {loading ? "Küldés…" : "Kód küldése e-mailre"}
               </Button>
             </form>
-
             <p className="text-center text-sm text-muted-foreground">
               Már van fiókja?{" "}
-              <Link href="/login" className="underline underline-offset-4">
-                Belépés
-              </Link>
+              <Link href="/login" className="underline underline-offset-4">Belépés</Link>
             </p>
           </>
+        ) : (
+          <form onSubmit={handleVerifyOtp} className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="otp">6 jegyű kód</Label>
+              <Input id="otp" type="text" inputMode="numeric" pattern="\d{6}" maxLength={6}
+                placeholder="123456" value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, ""))} required autoFocus />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <Button type="submit" className="w-full" disabled={loading || otp.length < 6}>
+              {loading ? "Ellenőrzés…" : "Fiók létrehozása"}
+            </Button>
+            <Button type="button" variant="ghost" className="w-full text-sm" onClick={() => { setStep("email"); setError(null); setOtp(""); }}>
+              ← Más e-mail cím
+            </Button>
+          </form>
         )}
       </CardContent>
     </Card>
