@@ -45,7 +45,7 @@ export async function POST(
     .from("jobs")
     .select(`
       id, job_number, title, assigned_to,
-      customers (full_name, phone, email)
+      customers (name, phone, email)
     `)
     .eq("id", params.id)
     .eq("company_id", cu.company_id)
@@ -74,7 +74,7 @@ export async function POST(
   }
 
   const mergedVars: Record<string, string> = {
-    customer_name: (customer as any)?.full_name ?? "Kedves Ügyfél",
+    customer_name: (customer as any)?.name ?? "Kedves Ügyfél",
     job_number: (job as any).job_number ?? "",
     technician_name: techName,
     ...vars,

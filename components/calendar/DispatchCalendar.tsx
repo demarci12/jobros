@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   DndContext, DragOverlay, PointerSensor, useSensor, useSensors,
+  useDroppable, useDraggable,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
 import { Button } from "@/components/ui/button";
@@ -229,9 +230,7 @@ export function DispatchCalendar({
                       {Array.from({ length: TOTAL_HOURS * 4 }, (_, i) => {
                         const mins = i * 15;
                         return (
-                          <div key={i} data-drop-id={`${dropId}:${mins}`}
-                            id={`${dropId}:${mins}`}
-                            className="absolute w-full hover:bg-blue-100/30"
+                          <DroppableCell key={i} id={`${dropId}:${mins}`}
                             style={{ top: (mins / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 4 }} />
                         );
                       })}
@@ -265,8 +264,14 @@ export function DispatchCalendar({
   );
 }
 
+function DroppableCell({ id, style }: { id: string; style: React.CSSProperties }) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div ref={setNodeRef} className={`absolute w-full ${isOver ? "bg-blue-100/50" : ""}`} style={style} />
+  );
+}
+
 function DraggableAppt({ appt, top, height }: { appt: Appointment; top: number; height: number }) {
-  const { useDraggable } = require("@dnd-kit/core");
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: appt.id });
 
   return (

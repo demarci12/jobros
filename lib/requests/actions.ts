@@ -1,0 +1,113 @@
+"use server";
+
+import { z } from "zod";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+
+async function getDispatcher() {
+  const supabase = createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return null;
+  const { data: cu } = await supabase
+    .from("company_users").select("company_id, role")
+    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
+  if (!cu || !["owner", "dispatcher"].includes(cu.role)) return null;
+  return { supabase, user, cu };
+}
+
+export async function updateRequestStatus(id: string, status: "new" | "contacted" | "converted" | "spam") {
+  const ctx = await getDispatcher();
+  if (!ctx) return { error: "Nincs jogosultság." };
+
+  const { error } = await ctx.supabase
+    .from("booking_requests")
+    .update({ status })
+    .eq("id", id).eq("company_id", ctx.cu.company_id);
+
+  if (error) return { error: error.message };
+  revalidatePath("/requests");
+  return { ok: true };
+}
+
+const ConvertSchema = z.object({
+  requestId: z.string().uuid(),
+  customerId: z.string().uuid().nullable(),
+  // if customerId is null, create a new customer from request data
+  newCustomerName: z.string().max(200).optional(),
+  newCustomerPhone: z.string().max(50).optional(),
+  newCustomerEmail: z.string().email().max(200).optional().or(z.literal("")),
+  siteAddress: z.string().max(500).optional(),
+  serviceId: z.string().uuid().nullable(),
+});
+
+export async function convertRequestToJob(raw: unknown) {
+  const ctx = await getDispatcher();
+  if (!ctx) return { error: "Nincs jogosultság." };
+
+  const parsed = ConvertSchema.safeParse(raw);
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message };
+
+  const { requestId, customerId, newCustomerName, newCustomerPhone, newCustomerEmail, siteAddress, serviceId } = parsed.data;
+  const { supabase, cu, user } = ctx;
+
+  // Verify request belongs to company
+  const { data: req } = await supabase.from("booking_requests")
+    .select("id, name, phone, email, address, message, status")
+    .eq("id", requestId).eq("company_id", cu.company_id).maybeSingle();
+  if (!req) return { error: "Kérés nem található." };
+  if (req.status === "converted") return { error: "Ez a kérés már konvertálva van." };
+
+  let resolvedCustomerId = customerId;
+
+  // Create new customer if needed
+  if (!resolvedCustomerId) {
+    const name = newCustomerName ?? req.name;
+    if (!name) return { error: "Ügyfél neve kötelező." };
+
+    const { data: newCustomer, error: ce } = await supabase.from("customers").insert({
+      company_id: cu.company_id,
+      name,
+      phone: newCustomerPhone ?? req.phone ?? null,
+      email: newCustomerEmail ?? req.email ?? null,
+    }).select("id").single();
+    if (ce) return { error: ce.message };
+    resolvedCustomerId = newCustomer.id;
+
+    // Create site if address provided
+    if (siteAddress ?? req.address) {
+      await supabase.from("sites").insert({
+        company_id: cu.company_id,
+        customer_id: resolvedCustomerId,
+        address: siteAddress ?? req.address,
+      });
+    }
+  }
+
+  // Generate job number
+  const year = new Date().getFullYear().toString();
+  const { count } = await supabase.from("jobs")
+    .select("id", { count: "exact", head: true })
+    .eq("company_id", cu.company_id)
+    .like("job_number", `${year}-%`);
+  const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
+  const jobNumber = `${year}-${seq}`;
+
+  const { data: job, error: je } = await supabase.from("jobs").insert({
+    company_id: cu.company_id,
+    job_number: jobNumber,
+    customer_id: resolvedCustomerId,
+    service_id: serviceId ?? null,
+    title: req.message?.slice(0, 100) ?? null,
+    status: "uj",
+    created_by: user.id,
+  }).select("id").single();
+  if (je) return { error: je.message };
+
+  // Mark request as converted
+  await supabase.from("booking_requests")
+    .update({ status: "converted", job_id: job.id })
+    .eq("id", requestId).eq("company_id", cu.company_id);
+
+  revalidatePath("/requests");
+  return { jobId: job.id };
+}

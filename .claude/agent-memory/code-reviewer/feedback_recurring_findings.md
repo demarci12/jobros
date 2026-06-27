@@ -129,6 +129,36 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 
 ---
 
+## Status machine bypass invoice route-ban
+
+`app/api/jobs/[id]/invoice/route.ts:89` közvetlenül `service.from("jobs").update({ status: "szamlazva" })` — nem hívja az `assertTransition` függvényt a `lib/jobs/status-machine.ts`-ből. CLAUDE.md vasszabály: "Státusz-váltás MINDIG a status-machine-en át." Jelen esetben a sor előtt van `job.status !== "kesz"` ellenőrzés, tehát a `kesz → szamlazva` átmenet logikailag helyes, de a gépen való átmenetelés kötelező.
+
+**Why:** Első megtalálva full-stack review-ban 2026-06-27.
+
+**How to apply:** Flag as BLOKKOLÓ ha bármely route/action közvetlenül írja a `jobs.status` mezőt `assertTransition` meghívása nélkül.
+
+---
+
+## Job-number generálás TOCTOU race condition
+
+`components/booking/actions.ts` job number generálása: `SELECT count ... + 1` → `INSERT job_number`. Egyidejű kérések ugyanazt a számot kapják, az INSERT unique constraint conflict-tel dob, retry logika nincs.
+
+**Why:** Első megtalálva full-stack review-ban 2026-06-27.
+
+**How to apply:** Flag as HIGH. Helyes minta: DB-szintű sequence vagy `FOR UPDATE` lock, esetleg `year_seq` counter tábla atomikus incrementtel.
+
+---
+
+## `createBooking` server action zod-validáció nélkül
+
+`components/booking/actions.ts` `createBooking` függvény semmilyen zod sémát nem alkalmaz a határon. CLAUDE.md vasszabály: "Minden mutáció zod-dal validál a határon."
+
+**Why:** Első megtalálva full-stack review-ban 2026-06-27.
+
+**How to apply:** Flag as BLOKKOLÓ ha server action bemenete nincs zod sémán áthajtva.
+
+---
+
 ## auth/callback `next` param figyelmen kívül marad `!company_user` esetén
 
 `app/auth/callback/route.ts` ha a felhasználónak nincs `company_users` sora, mindig `/onboarding`-ra dob vissza — az explicit `next` paramétert elveti. Ez eltöri az accept-invite flow-t: a new user soha nem éri el `/accept-invite/[token]`-t. Ha `next` nem az alapértelmezett `/dashboard`, a `!cu` ágban is a `next` útvonalra kell irányítani.
@@ -156,6 +186,26 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 **Why:** Két egyidejű munkalap-mentés ugyanarra az anyagra elveszítheti az egyik mozgást.
 
 **How to apply:** Flag as CRITICAL ha bármely készlet-módosítás SELECT + UPDATE kétlépéses mintát követ. Mindig atomic UPDATE szükséges.
+
+---
+
+## `useDroppable` KÖTELEZŐ DnD Kit drop-zónákhoz — plain `<div id>` nem elegendő
+
+`@dnd-kit/core` `onDragEnd` eseményének `over` property-je CSAK olyan elemre mutat, amelyet `useDroppable()` hook regisztrált. Plain `<div id="...">` elemek nem szerepelnek a DnD Kit droppable registry-jában — `over` mindig `null` lesz, az `onDragEnd` handler azonnal visszatér.
+
+**Why:** `DispatchCalendar.tsx` drop-cell-ek plain `<div id={dropId}>` formában vannak megvalósítva `useDroppable` nélkül → drag-drop teljesen broken.
+
+**How to apply:** Flag as CRITICAL ha DnD Kit drop target plain DOM elem id-vel van implementálva `useDroppable` hook nélkül.
+
+---
+
+## `require()` hook inside React component body
+
+`useDraggable` (és bármely React hook) nem hívható `require()` dinamikus import belsejéből egy component function body-ban. Renderenként újra lefut, megsérti a Hooks szabályokat, és webpack/turbopack nem tudja statikusan elemezni.
+
+**Why:** `DispatchCalendar.tsx` `DraggableAppt` komponens: `const { useDraggable } = require("@dnd-kit/core")` a component body-ban. Inkább top-level `import { useDraggable } from "@dnd-kit/core"` szükséges.
+
+**How to apply:** Flag as HIGH ha bármely hook `require()` hívásból van destructure-ölve egy component function belsejében.
 
 ---
 

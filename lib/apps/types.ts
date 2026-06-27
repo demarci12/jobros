@@ -28,6 +28,7 @@ export interface InvoiceResult {
   invoiceNumber: string;
   pdfUrl?: string;
   navStatus: "pending" | "done" | "error";
+  grossTotal?: number;
 }
 
 export interface NavStatus {

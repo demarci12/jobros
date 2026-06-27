@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveInvoicingProvider } from "@/lib/apps/registry";
+import { assertTransition, type JobStatus } from "@/lib/jobs/status-machine";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -71,12 +72,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 
+  // Státuszgép validálás (vasszabály: assertTransition mindig)
+  try {
+    assertTransition(job.status as JobStatus, "szamlazva");
+  } catch (e: unknown) {
+    return NextResponse.json({ error: (e as Error).message }, { status: 422 });
+  }
+
   // Rögzítjük az invoices táblában
   const { data: invoice, error: insertErr } = await service.from("invoices").insert({
     company_id: cu.company_id,
     job_id: jobId,
     external_id: result.externalId,
     invoice_number: result.invoiceNumber,
+    gross_total: result.grossTotal ?? null,
     nav_status: result.navStatus,
     pdf_url: result.pdfUrl ?? null,
     idempotency_key: idempotencyKey,
@@ -85,7 +94,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
-  // Job státusz → szamlazva
+  // Job státusz → szamlazva (státuszgép már validálta)
   await service.from("jobs").update({ status: "szamlazva" }).eq("id", jobId);
 
   return NextResponse.json({ invoice });

@@ -1,26 +1,24 @@
 "use server";
 
+import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 
-export async function createBooking({
-  customerId,
-  siteId,
-  serviceId,
-  title,
-  kind,
-  technicianId,
-  startsAt,
-  endsAt,
-}: {
-  customerId: string;
-  siteId: string;
-  serviceId: string | null;
-  title: string | null;
-  kind: "munka" | "felmeres";
-  technicianId: string | null;
-  startsAt: string;
-  endsAt: string;
-}) {
+const CreateBookingSchema = z.object({
+  customerId: z.string().uuid(),
+  siteId: z.string().uuid(),
+  serviceId: z.string().uuid().nullable(),
+  title: z.string().max(255).nullable(),
+  kind: z.enum(["munka", "felmeres"]),
+  technicianId: z.string().uuid().nullable(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+});
+
+export async function createBooking(input: z.infer<typeof CreateBookingSchema>) {
+  const parsed = CreateBookingSchema.safeParse(input);
+  if (!parsed.success) return { error: "Érvénytelen adatok: " + parsed.error.issues[0]?.message };
+  const { customerId, siteId, serviceId, title, kind, technicianId, startsAt, endsAt } = parsed.data;
+
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return { error: "Nincs jogosultság." };
