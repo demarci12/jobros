@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { WorksheetClient } from "@/components/worksheet/WorksheetClient";
 import { SignaturePad } from "@/components/worksheet/SignaturePad";
 import { PhotoUpload } from "@/components/worksheet/PhotoUpload";
+import { TimeTracker } from "@/components/worksheet/TimeTracker";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 
@@ -29,6 +30,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     { data: signatures },
     { data: attachments },
     { data: catalogMaterials },
+    { data: timeEntries },
   ] = await Promise.all([
     supabase.from("worksheets").select("id, work_done, labor_hours")
       .eq("job_id", params.id).eq("company_id", cu.company_id).maybeSingle(),
@@ -38,6 +40,10 @@ export default async function WorksheetPage({ params }: { params: { id: string }
       .eq("job_id", params.id).eq("kind", "photo").order("created_at"),
     supabase.from("materials").select("id, name, unit, unit_price, vat_rate")
       .eq("company_id", cu.company_id).eq("is_active", true).order("name"),
+    supabase.from("time_entries")
+      .select("id, technician_id, started_at, stopped_at, duration_min, note, profiles(full_name)")
+      .eq("job_id", params.id).eq("company_id", cu.company_id)
+      .order("started_at", { ascending: false }),
   ]);
 
   const { data: lines } = worksheet
@@ -70,6 +76,16 @@ export default async function WorksheetPage({ params }: { params: { id: string }
         canEdit={canEdit}
         catalogMaterials={(catalogMaterials ?? []) as any}
       />
+
+      {/* Időkövetés */}
+      <div className="space-y-2">
+        <TimeTracker
+          jobId={params.id}
+          entries={(timeEntries ?? []) as any}
+          currentUserId={user.id}
+          canEdit={canEdit}
+        />
+      </div>
 
       {/* Fotók */}
       {canEdit && (
