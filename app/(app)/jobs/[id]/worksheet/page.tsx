@@ -1,8 +1,11 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { WorksheetClient } from "@/components/worksheet/WorksheetClient";
 import { SignaturePad } from "@/components/worksheet/SignaturePad";
 import { PhotoUpload } from "@/components/worksheet/PhotoUpload";
+import { Button } from "@/components/ui/button";
+import { FileDown } from "lucide-react";
 
 export default async function WorksheetPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -44,6 +47,15 @@ export default async function WorksheetPage({ params }: { params: { id: string }
 
   return (
     <div className="space-y-8 max-w-2xl">
+      {worksheet && (
+        <div className="flex justify-end">
+          <Link href={`/api/pdf/worksheet/${worksheet.id}`} target="_blank">
+            <Button variant="outline" size="sm">
+              <FileDown size={14} className="mr-1.5" /> Munkalap PDF
+            </Button>
+          </Link>
+        </div>
+      )}
       <WorksheetClient
         jobId={params.id}
         worksheet={{
