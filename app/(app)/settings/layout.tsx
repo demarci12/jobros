@@ -15,6 +15,7 @@ const settingsNav = [
   { href: "/settings/templates",      label: "Sablonok" },
   { href: "/settings/notifications",  label: "Értesítések" },
   { href: "/settings/integrations",   label: "Integrációk" },
+  { href: "/settings/billing-list", label: "Számlák" },
   { href: "/settings/subscription", label: "Előfizetés" },
 ] as const;
 
