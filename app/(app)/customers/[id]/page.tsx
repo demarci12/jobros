@@ -1,8 +1,12 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { CustomerHeader } from "@/components/crm/CustomerHeader";
 import { SitesList } from "@/components/crm/SitesList";
 import { BookingButton } from "@/components/booking/BookingButton";
+import { Badge } from "@/components/ui/badge";
+import { STATUS_LABELS, STATUS_COLORS } from "@/lib/jobs/status-machine";
+import type { JobStatus } from "@/lib/jobs/status-machine";
 
 export default async function CustomerPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -34,6 +38,16 @@ export default async function CustomerPage({ params }: { params: { id: string } 
     .order("created_at");
 
   const canEdit = ["owner", "dispatcher"].includes(cu.role);
+
+  // Job előzmények
+  const { data: jobs } = await supabase
+    .from("jobs")
+    .select("id, job_number, title, status, created_at, services(name)")
+    .eq("customer_id", params.id)
+    .eq("company_id", cu.company_id)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(50);
 
   // Booking data
   const [{ data: services }, { data: technicians }, { data: company }, { data: upcomingAppts }] = await Promise.all([
@@ -80,6 +94,32 @@ export default async function CustomerPage({ params }: { params: { id: string } 
         equipment={equipment ?? []}
         canEdit={canEdit}
       />
+
+      {/* Munka előzmények */}
+      {(jobs ?? []).length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-sm font-semibold">Munka előzmények</h2>
+          <div className="rounded-lg border divide-y">
+            {(jobs ?? []).map((job: any) => (
+              <Link key={job.id} href={`/jobs/${job.id}`}
+                className="flex items-center justify-between gap-3 px-4 py-2.5 hover:bg-muted/40 transition-colors">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="font-mono text-xs text-muted-foreground shrink-0">{job.job_number}</span>
+                  <span className="text-sm truncate">{job.title ?? job.services?.name ?? "—"}</span>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(job.created_at).toLocaleDateString("hu-HU", { year: "numeric", month: "short", day: "numeric" })}
+                  </span>
+                  <Badge className={`text-xs ${STATUS_COLORS[job.status as JobStatus] ?? ""}`}>
+                    {STATUS_LABELS[job.status as JobStatus] ?? job.status}
+                  </Badge>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

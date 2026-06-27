@@ -79,6 +79,7 @@ export function ManualSlotPicker({
     const startMin = bounds.startMin + clickMin;
     const endMin = startMin + durationMin;
     if (endMin > bounds.endMin) return;
+    if (isBooked(day, startMin, endMin)) return; // ütközés tiltás
     const start = new Date(day);
     start.setHours(Math.floor(startMin / 60), startMin % 60, 0, 0);
     const end = new Date(day);
