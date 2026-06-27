@@ -12,6 +12,7 @@ const settingsNav = [
   { href: "/settings/zones",        label: "Zónák" },
   { href: "/settings/booking",      label: "Foglalás" },
   { href: "/settings/materials",      label: "Anyagok" },
+  { href: "/settings/templates",      label: "Sablonok" },
   { href: "/settings/notifications",  label: "Értesítések" },
   { href: "/settings/integrations",   label: "Integrációk" },
   { href: "/settings/subscription", label: "Előfizetés" },

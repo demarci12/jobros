@@ -5,6 +5,7 @@ import { WorksheetClient } from "@/components/worksheet/WorksheetClient";
 import { SignaturePad } from "@/components/worksheet/SignaturePad";
 import { PhotoUpload } from "@/components/worksheet/PhotoUpload";
 import { TimeTracker } from "@/components/worksheet/TimeTracker";
+import { ChecklistPanel } from "@/components/jobs/ChecklistPanel";
 import { Button } from "@/components/ui/button";
 import { FileDown } from "lucide-react";
 
@@ -31,6 +32,8 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     { data: attachments },
     { data: catalogMaterials },
     { data: timeEntries },
+    { data: checklistItems },
+    { data: checklistTemplates },
   ] = await Promise.all([
     supabase.from("worksheets").select("id, work_done, labor_hours")
       .eq("job_id", params.id).eq("company_id", cu.company_id).maybeSingle(),
@@ -44,6 +47,14 @@ export default async function WorksheetPage({ params }: { params: { id: string }
       .select("id, technician_id, started_at, stopped_at, duration_min, note, profiles(full_name)")
       .eq("job_id", params.id).eq("company_id", cu.company_id)
       .order("started_at", { ascending: false }),
+    supabase.from("job_checklist_state")
+      .select("id, label, is_done, done_at, done_by")
+      .eq("job_id", params.id).eq("company_id", cu.company_id)
+      .order("created_at"),
+    supabase.from("job_templates")
+      .select("id, name")
+      .eq("company_id", cu.company_id)
+      .order("name"),
   ]);
 
   const { data: lines } = worksheet
@@ -76,6 +87,16 @@ export default async function WorksheetPage({ params }: { params: { id: string }
         canEdit={canEdit}
         catalogMaterials={(catalogMaterials ?? []) as any}
       />
+
+      {/* Ellenőrzőlista */}
+      <div className="space-y-2">
+        <ChecklistPanel
+          jobId={params.id}
+          initialItems={(checklistItems ?? []) as any}
+          templates={(checklistTemplates ?? []) as any}
+          canEdit={canEdit}
+        />
+      </div>
 
       {/* Időkövetés */}
       <div className="space-y-2">
