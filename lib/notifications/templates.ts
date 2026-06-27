@@ -4,7 +4,8 @@ export type NotificationEvent =
   | "invoice_sent"
   | "service_reminder"
   | "appointment_confirmed"
-  | "appointment_cancelled";
+  | "appointment_cancelled"
+  | "trial_ending";
 
 export const DEFAULT_TEMPLATES: Record<NotificationEvent, string> = {
   technician_on_the_way:
@@ -19,6 +20,8 @@ export const DEFAULT_TEMPLATES: Record<NotificationEvent, string> = {
     "Kedves {customer_name}! Időpontja megerősítve: {appointment_date} {appointment_time}. Jobro",
   appointment_cancelled:
     "Kedves {customer_name}! {appointment_date} {appointment_time}-i időpontja lemondva. Jobro",
+  trial_ending:
+    "Kedves {customer_name}! A Jobro próbaidőszaka {days_left} nap múlva ({trial_ends_at}) lejár. Az előfizetés a Beállítások → Előfizetés menüben megújítható. Jobro csapata",
 };
 
 export function renderTemplate(

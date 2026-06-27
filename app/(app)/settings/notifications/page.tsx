@@ -11,6 +11,7 @@ const EVENT_LABELS: Record<NotificationEvent, string> = {
   service_reminder:       "Szerviz emlékeztető",
   appointment_confirmed:  "Időpont visszaigazolás",
   appointment_cancelled:  "Időpont lemondás",
+  trial_ending:           "Próbaidőszak lejárat (belső)",
 };
 
 export default async function NotificationsPage() {
