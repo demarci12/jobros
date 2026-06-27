@@ -3,6 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveCalendarProvider } from "@/lib/apps/registry";
 
+async function parseBody(request: Request): Promise<{ appointmentId?: string } | null> {
+  try {
+    return await request.json() as { appointmentId?: string };
+  } catch {
+    return null;
+  }
+}
+
 // POST /api/calendar/sync — push a single appointment to the company's calendar connector
 export async function POST(request: Request) {
   const supabase = createClient();
@@ -16,7 +24,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { appointmentId } = await request.json() as { appointmentId: string };
+  const body = await parseBody(request);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const { appointmentId } = body;
   if (!appointmentId) return NextResponse.json({ error: "Missing appointmentId" }, { status: 400 });
 
   const service = createServiceClient();
@@ -71,7 +81,9 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { appointmentId } = await request.json() as { appointmentId: string };
+  const body = await parseBody(request);
+  if (!body) return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  const { appointmentId } = body;
   if (!appointmentId) return NextResponse.json({ error: "Missing appointmentId" }, { status: 400 });
 
   const service = createServiceClient();

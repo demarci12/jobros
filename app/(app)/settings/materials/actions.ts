@@ -60,24 +60,26 @@ export async function adjustStock(materialId: string, quantity: number, reason: 
   const ctx = await getCtx();
   if (!ctx) return { error: "Nincs jogosultság." };
 
-  const { error } = await ctx.supabase.from("stock_movements").insert({
+  // Verify the material belongs to this company before touching stock
+  const { data: mat, error: matErr } = await ctx.supabase
+    .from("materials").select("id")
+    .eq("id", materialId).eq("company_id", ctx.companyId).maybeSingle();
+  if (matErr || !mat) return { error: "Az anyag nem található." };
+
+  // Atomic increment — avoids read-modify-write race condition
+  const { error: stockErr } = await ctx.supabase.rpc("increment_stock", {
+    p_material_id: materialId,
+    p_delta: quantity,
+  });
+  if (stockErr) return { error: stockErr.message };
+
+  await ctx.supabase.from("stock_movements").insert({
     company_id: ctx.companyId,
     material_id: materialId,
     quantity,
     reason,
     created_by: ctx.userId,
   });
-
-  if (error) return { error: error.message };
-
-  // Update stock_qty
-  const { data: mat } = await ctx.supabase.from("materials")
-    .select("stock_qty").eq("id", materialId).single();
-  if (mat) {
-    await ctx.supabase.from("materials")
-      .update({ stock_qty: Number(mat.stock_qty) + quantity })
-      .eq("id", materialId);
-  }
 
   revalidatePath("/settings/materials");
   return { success: true };

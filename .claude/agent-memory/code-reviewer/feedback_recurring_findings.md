@@ -149,6 +149,46 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 
 ---
 
+## Read-modify-write race condition a készlet frissítésnél
+
+`adjustStock` (settings/materials/actions.ts) és `addWorksheetLine` (lib/worksheets/actions.ts) mindkettő külön SELECT + UPDATE-tel módosítja a `materials.stock_qty`-t. Ez race condition. Helyes minta: `UPDATE materials SET stock_qty = stock_qty + $delta WHERE id = $id AND company_id = $company_id`.
+
+**Why:** Két egyidejű munkalap-mentés ugyanarra az anyagra elveszítheti az egyik mozgást.
+
+**How to apply:** Flag as CRITICAL ha bármely készlet-módosítás SELECT + UPDATE kétlépéses mintát követ. Mindig atomic UPDATE szükséges.
+
+---
+
+## `<form action={clientFn}>` nem működik React 18-ban
+
+`<form action={fn}>` ahol `fn` kliens closure (nem server action) — a böngésző URL-ként kezeli és native POST-ot küld. React 18-ban ez csak server action függvénnyel működik. Kliens callback-hez `onSubmit` + `e.preventDefault()` szükséges.
+
+**Why:** `materials-client.tsx` MaterialForm-ban ezzel hibázott.
+
+**How to apply:** Flag as CRITICAL ha `<form action={...}>` kliens-oldali függvényt kap, nem server action-t.
+
+---
+
+## Site insert hiba eldobása `createQuickCustomer`-ben (crm/actions.ts)
+
+Ha a site insert hibát ad, a gyors ügyfélrögzítés mégis `{ id }` értékkel tér vissza — ügyfél mentett, de telephelye nincs.
+
+**Why:** A Supabase client hibáját nem ellenőrzik, a return statement mindig lefut.
+
+**How to apply:** Flag as HIGH ha Server Action belső insert-eredményét nem ellenőrzik, és a függvény mégis sikert jelent.
+
+---
+
+## `company_users:assigned_to` join PostgREST-ben null-t adhat
+
+Ha `jobs.assigned_to` → `auth.users(id)` (nem `company_users(id)`), a PostgREST `company_users:assigned_to (...)` szintaxis nem tud ezen az FK-n joinolni → null. Kétlépéses joinra van szükség.
+
+**Why:** Notify route-ban technician_name mindig "Szerelőnk" lesz.
+
+**How to apply:** Flag as HIGH ha egy join-alias a FK céltábláján kívüli táblát céloz.
+
+---
+
 ## ConfirmDelete dialog can be dismissed via ESC/backdrop while loading
 
 `components/common/ConfirmDelete.tsx` passes `onOpenChange` directly to `<Dialog>` without guarding against close events while `loading=true`. This means the dialog can be ESC-closed mid-operation, leaving the delete in flight with no UI feedback.

@@ -44,9 +44,8 @@ export async function POST(
   const { data: job } = await service
     .from("jobs")
     .select(`
-      id, job_number, title,
-      customers (full_name, phone, email),
-      company_users:assigned_to (profiles (full_name))
+      id, job_number, title, assigned_to,
+      customers (full_name, phone, email)
     `)
     .eq("id", params.id)
     .eq("company_id", cu.company_id)
@@ -55,10 +54,15 @@ export async function POST(
   if (!job) return NextResponse.json({ error: "Job not found" }, { status: 404 });
 
   const customer = Array.isArray(job.customers) ? job.customers[0] : job.customers;
-  const assignedUser = Array.isArray(job.company_users) ? job.company_users[0] : job.company_users;
-  const techProfile = Array.isArray((assignedUser as any)?.profiles)
-    ? (assignedUser as any).profiles[0]
-    : (assignedUser as any)?.profiles;
+
+  // assigned_to is a FK to profiles.id
+  let techName = "Szerelőnk";
+  if ((job as any).assigned_to) {
+    const { data: prof } = await service
+      .from("profiles").select("full_name")
+      .eq("id", (job as any).assigned_to).maybeSingle();
+    if (prof?.full_name) techName = prof.full_name;
+  }
 
   const { event, channel, vars } = parsed.data;
 
@@ -72,7 +76,7 @@ export async function POST(
   const mergedVars: Record<string, string> = {
     customer_name: (customer as any)?.full_name ?? "Kedves Ügyfél",
     job_number: (job as any).job_number ?? "",
-    technician_name: (techProfile as any)?.full_name ?? "Szerelőnk",
+    technician_name: techName,
     ...vars,
   };
 

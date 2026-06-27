@@ -50,8 +50,21 @@ T-01 inicializálás auditálva: 2026-06-26.
 - `subscriptions_select` policy: `has_role(company_id, ['owner'])` — csak owner olvashat, dispatcher/technician nem. Rendben.
 - `invoice.payment_succeeded`: a `companyId` extraction kettős fallback (metadata vagy subscription_details.metadata) — rendben, de ha mindkettő null, csendesen kihagyja.
 
+**Teljes migráció audit (2026-06-27): 0004–0017**
+
+- `invoices_update` policy (0015): HIGH — a komment szerint csak service_role módosíthatja a `nav_status`/`external_id`/`pdf_url` mezőket, de az `invoices_update` policy owner/dispatcher számára az összes mezőt módosíthatóvá teszi. Pénzügyi integritási lyuk — javítandó: policy törlése, csak service_role frissíthet számlát.
+- Schema prefix hiány (0006–0015): MEDIUM — 71 helyen unqualified `auth_company_ids()` / `has_role()` hívás RLS policy-kban. A helper függvények `SET search_path = ''`-vel készültek, de a policy-k a session search_path-ját használják. Supabase-en most működik, de fragilis. 0016–0017 és 0003 helyesen `public.` prefixet használ.
+- `zones_update` (0011): MEDIUM — hiányzó `with check` az UPDATE policy-ból; PostgreSQL az `using`-t is alkalmazza write-checkként, de explicit `with check` nélkül cross-tenant company_id csere nem blokkolt.
+- `notification_settings_upsert` (0017): `for all` policy — owner SELECT+INSERT+UPDATE+DELETE jogot kap, dispatcher csak SELECT-et. Funkcionálisan helyes, de a DELETE szándékossága kérdéses.
+- `stock_movements` (0016): nincs UPDATE/DELETE policy — szándékos audit trail, helyes.
+- `notifications` (0017): nincs kliens INSERT policy — szándékos service_role only, helyes.
+- `service_role` kulcs: `lib/supabase/service.ts` `import "server-only"` guard megvan, kliens komponens nem importálja. Rendben.
+- Trigger függvények `generate_job_number`, `log_job_status_change`, `bump_next_service` (0008): hiányzó `SET search_path = ''`. Nem SECURITY DEFINER, de ajánlott.
+
 **Visszatérő kockázati pont a jövőben:**
 - Minden új kliens komponens (`'use client'`) létrehozásakor ellenőrizni kell, hogy nem importál-e `lib/supabase/service.ts`-t.
-- Minden új migrációban `company_id` szűrés + RLS engedélyezés kötelező.
+- Minden új migrációban `company_id` szűrés + RLS engedélyezés + `public.` schema prefix kötelező.
 - Szerepkör-hozzárendelési policy-knál mindig ellenőrizni: a WITH CHECK nemcsak a hívó jogát, hanem az beillesztendő szerepkört is korlátozza-e (dispatcher→owner escalation minta).
 - Invitation accept flow: elfogadó endpoint mindig service_role-t használ, tokenvalidáció (expired, already accepted) az első lépés.
+- UPDATE policy-knál mindig explicit `with check` kell, ne csak `using` — különben a módosított sor company_id-ja nem ellenőrzött.
+- Számlázási táblák (invoices, subscriptions) UPDATE-jét kizárólag service_role-os Server Action-ból szabad végezni; soha ne legyen kliens UPDATE policy pénzügyi mezőkre.

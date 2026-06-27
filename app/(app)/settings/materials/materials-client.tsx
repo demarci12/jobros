@@ -42,7 +42,7 @@ function MaterialForm({
   isPending: boolean;
 }) {
   return (
-    <form action={onSubmit} className="space-y-4">
+    <form onSubmit={e => { e.preventDefault(); onSubmit(new FormData(e.currentTarget)); }} className="space-y-4">
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1">
           <Label>Megnevezés *</Label>

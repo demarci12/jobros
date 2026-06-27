@@ -90,16 +90,17 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
   });
   if (error) return { error: error.message };
 
-  // Stock deduction when material is linked
+  // Atomic stock deduction when material is linked
   if (material_id && lineData.quantity > 0) {
+    // Verify material belongs to this company
     const { data: mat } = await ctx.supabase
-      .from("materials").select("stock_qty")
+      .from("materials").select("id")
       .eq("id", material_id).eq("company_id", ctx.companyId).maybeSingle();
     if (mat) {
-      const newQty = Number(mat.stock_qty) - lineData.quantity;
-      await ctx.supabase.from("materials")
-        .update({ stock_qty: newQty >= 0 ? newQty : 0 })
-        .eq("id", material_id);
+      await ctx.supabase.rpc("increment_stock", {
+        p_material_id: material_id,
+        p_delta: -lineData.quantity,
+      });
       await ctx.supabase.from("stock_movements").insert({
         company_id: ctx.companyId,
         material_id,

@@ -64,7 +64,7 @@ export async function createQuickCustomer(formData: FormData) {
   const geo = await geocodeAddress(address, city ?? undefined);
   if (geo) { lat = geo.lat; lng = geo.lng; h3_index = toH3(geo.lat, geo.lng); }
 
-  await ctx.supabase.from("sites").insert({
+  const { error: siteErr } = await ctx.supabase.from("sites").insert({
     company_id: ctx.companyId,
     customer_id: customer.id,
     address,
@@ -73,6 +73,12 @@ export async function createQuickCustomer(formData: FormData) {
     lng,
     h3_index,
   });
+
+  if (siteErr) {
+    // Roll back the customer if site creation fails — leave no orphan
+    await ctx.supabase.from("customers").delete().eq("id", customer.id);
+    return { error: `Helyszín mentése sikertelen: ${siteErr.message}` };
+  }
 
   return { id: customer.id };
 }
