@@ -28,16 +28,26 @@ type Worksheet = {
   lines: Line[];
 };
 
+export type CatalogMaterial = {
+  id: string;
+  name: string;
+  unit: string;
+  unit_price: number;
+  vat_rate: number;
+};
+
 const VAT_OPTIONS = [0, 5, 18, 27];
 
 export function WorksheetClient({
   jobId,
   worksheet,
   canEdit,
+  catalogMaterials = [],
 }: {
   jobId: string;
   worksheet: Worksheet;
   canEdit: boolean;
+  catalogMaterials?: CatalogMaterial[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -49,6 +59,7 @@ export function WorksheetClient({
   const [newLine, setNewLine] = useState({
     description: "", quantity: "1", unit: "db",
     unit_price: "0", vat_rate: "27", is_labor: false,
+    material_id: "",
   });
 
   function handleSaveWorksheet() {
@@ -70,12 +81,12 @@ export function WorksheetClient({
     if (!worksheetId) { toast.error("Előbb mentsd a munkalapot!"); return; }
     startTransition(async () => {
       const fd = new FormData();
-      Object.entries(newLine).forEach(([k, v]) => fd.set(k, v.toString()));
+      Object.entries(newLine).forEach(([k, v]) => { if (v !== "") fd.set(k, v.toString()); });
       if (newLine.is_labor) fd.set("is_labor", "1");
       const result = await addWorksheetLine(worksheetId, jobId, fd);
       if (result?.error) toast.error(result.error);
       else {
-        setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_labor: false });
+        setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_labor: false, material_id: "" });
         router.refresh();
       }
     });
@@ -180,6 +191,38 @@ export function WorksheetClient({
         {canEdit && (
           <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
             <p className="text-xs font-medium text-muted-foreground">Új tétel</p>
+
+            {/* Catalog picker */}
+            {catalogMaterials.length > 0 && (
+              <div className="space-y-1">
+                <Label className="text-xs">Katalógusból</Label>
+                <select
+                  className="h-8 w-full rounded-md border bg-background px-2 text-sm"
+                  value={newLine.material_id}
+                  onChange={e => {
+                    const mat = catalogMaterials.find(m => m.id === e.target.value);
+                    if (mat) {
+                      setNewLine(s => ({
+                        ...s,
+                        material_id: mat.id,
+                        description: mat.name,
+                        unit: mat.unit,
+                        unit_price: mat.unit_price.toString(),
+                        vat_rate: mat.vat_rate.toString(),
+                      }));
+                    } else {
+                      setNewLine(s => ({ ...s, material_id: "" }));
+                    }
+                  }}
+                >
+                  <option value="">— Kézi bevitel —</option>
+                  {catalogMaterials.map(m => (
+                    <option key={m.id} value={m.id}>{m.name} ({m.unit_price.toLocaleString("hu-HU")} Ft/{m.unit})</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <div className="col-span-2 sm:col-span-4 space-y-1">
                 <Label className="text-xs">Megnevezés</Label>

@@ -28,6 +28,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     { data: worksheet },
     { data: signatures },
     { data: attachments },
+    { data: catalogMaterials },
   ] = await Promise.all([
     supabase.from("worksheets").select("id, work_done, labor_hours")
       .eq("job_id", params.id).eq("company_id", cu.company_id).maybeSingle(),
@@ -35,6 +36,8 @@ export default async function WorksheetPage({ params }: { params: { id: string }
       .eq("job_id", params.id).order("signed_at"),
     supabase.from("attachments").select("id, storage_path, caption")
       .eq("job_id", params.id).eq("kind", "photo").order("created_at"),
+    supabase.from("materials").select("id, name, unit, unit_price, vat_rate")
+      .eq("company_id", cu.company_id).eq("is_active", true).order("name"),
   ]);
 
   const { data: lines } = worksheet
@@ -65,6 +68,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
           lines: (lines ?? []) as any,
         }}
         canEdit={canEdit}
+        catalogMaterials={(catalogMaterials ?? []) as any}
       />
 
       {/* Fotók */}

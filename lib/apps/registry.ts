@@ -1,13 +1,17 @@
 import "server-only";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getSecret } from "@/lib/secrets/vault";
-import type { AppCategory, Connector, InvoicingProvider } from "./types";
+import type { AppCategory, Connector, InvoicingProvider, CalendarProvider } from "./types";
 import { BillingoProvider } from "./invoicing/billingo";
+import { GoogleCalendarProvider } from "./calendar/google";
+import { AppleCalDAVProvider } from "./calendar/apple_caldav";
 
 type ProviderFactory = (apiKey: string) => Connector;
 
 const PROVIDER_MAP: Record<string, ProviderFactory> = {
   billingo: (key) => new BillingoProvider(key),
+  google_calendar: (key) => new GoogleCalendarProvider(key),
+  apple_calendar: (key) => new AppleCalDAVProvider(key),
 };
 
 export async function resolveConnector<T extends Connector>(
@@ -38,4 +42,8 @@ export async function resolveConnector<T extends Connector>(
 
 export async function resolveInvoicingProvider(companyId: string): Promise<InvoicingProvider | null> {
   return resolveConnector<InvoicingProvider>(companyId, "invoicing");
+}
+
+export async function resolveCalendarProvider(companyId: string): Promise<CalendarProvider | null> {
+  return resolveConnector<CalendarProvider>(companyId, "calendar");
 }

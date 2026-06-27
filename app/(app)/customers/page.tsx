@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/common/EmptyState";
+import { AddCustomerButton } from "./customers-client";
 import { Users, Phone } from "lucide-react";
 
 export default async function CustomersPage({ searchParams }: { searchParams: { q?: string } }) {
@@ -12,10 +12,11 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
   if (!user) redirect("/login");
 
   const { data: cu } = await supabase
-    .from("company_users").select("company_id")
+    .from("company_users").select("company_id, role")
     .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
   if (!cu) redirect("/onboarding");
 
+  const canEdit = ["owner", "dispatcher"].includes(cu.role);
   const q = searchParams.q?.trim() ?? "";
 
   let query = supabase
@@ -34,9 +35,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Ügyfelek</h1>
-        <Link href="/intake">
-          <Button size="sm">+ Új ügyfél</Button>
-        </Link>
+        <AddCustomerButton canEdit={canEdit} />
       </div>
 
       <form method="GET">
