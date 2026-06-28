@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Send, CheckCircle, XCircle } from "lucide-react";
+import { Trash2, Plus, Send, CheckCircle, XCircle, Download } from "lucide-react";
 import { toast } from "sonner";
 
 type QuoteLine = {
@@ -149,6 +149,11 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
         </div>
         {canEdit && (
           <div className="flex gap-2">
+            <a href={`/api/pdf/quote/${quote.id}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="gap-1">
+                <Download size={13} /> PDF
+              </Button>
+            </a>
             {quote.status === "draft" && (
               <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleStatusChange("sent")}>
                 <Send size={13} className="mr-1" /> Elküld

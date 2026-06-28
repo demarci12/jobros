@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Download } from "lucide-react";
 import { toast } from "sonner";
 
 type Line = {
@@ -132,6 +132,13 @@ export function WorksheetClient({
             <Button size="sm" variant="outline" disabled={isPending} onClick={handleSaveWorksheet}>
               Mentés
             </Button>
+          )}
+          {worksheetId && (
+            <a href={`/api/pdf/worksheet/${worksheetId}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="gap-1">
+                <Download size={13} /> PDF
+              </Button>
+            </a>
           )}
         </div>
       </div>
