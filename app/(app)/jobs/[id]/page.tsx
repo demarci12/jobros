@@ -32,10 +32,10 @@ export default async function JobOverviewPage({ params }: { params: { id: string
 
   const { data: equipment } = await supabase
     .from("equipment")
-    .select("id, name, kind, serial_number, next_service_due")
+    .select("id, manufacturer, model, kind, serial_number, next_service_due")
     .eq("site_id", (job as any).sites?.id ?? "")
     .is("deleted_at", null)
-    .order("name");
+    .order("manufacturer");
 
   return (
     <div className="space-y-5 max-w-lg">
@@ -107,7 +107,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
               const overdue = e.next_service_due && new Date(e.next_service_due) < new Date();
               return (
                 <li key={e.id} className="flex items-center gap-3 text-sm border rounded-md px-3 py-2">
-                  <span className="font-medium">{e.name}</span>
+                  <span className="font-medium">{e.manufacturer}{e.model ? ` ${e.model}` : ""}</span>
                   {e.serial_number && <span className="text-muted-foreground text-xs">S/N: {e.serial_number}</span>}
                   {e.next_service_due && (
                     <span className={`text-xs ml-auto ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>

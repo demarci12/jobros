@@ -35,6 +35,7 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
     <QuoteEditor
       jobId={params.id}
       initialQuote={quote ? { ...quote, lines: (lines ?? []) as any } : null}
+      canEdit={canEdit}
     />
   );
 }

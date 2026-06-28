@@ -40,7 +40,7 @@ const STATUS_LABELS: Record<string, string> = { draft: "Vázlat", sent: "Elküld
 const STATUS_COLORS: Record<string, string> = { draft: "bg-gray-100 text-gray-700", sent: "bg-blue-100 text-blue-700", accepted: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700" };
 const VAT_OPTIONS = [0, 5, 18, 27];
 
-export function QuoteEditor({ jobId, initialQuote }: { jobId: string; initialQuote: Quote | null }) {
+export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: string; initialQuote: Quote | null; canEdit?: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [quote, setQuote] = useState<Quote | null>(initialQuote);

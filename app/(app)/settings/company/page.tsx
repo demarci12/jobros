@@ -11,7 +11,7 @@ export default async function CompanyPage() {
     .from("companies")
     .select("name, tax_number, address, phone, email, public_slug")
     .eq("id", companyId)
-    .single();
+    .maybeSingle();
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://jobros.vercel.app";
 

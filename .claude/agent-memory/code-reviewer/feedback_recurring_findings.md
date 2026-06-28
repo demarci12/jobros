@@ -315,6 +315,46 @@ A job-number race condition nemcsak `booking/actions.ts`-ben (már dokumentálva
 
 ---
 
+## `equipment` táblának nincs `name` oszlopa — `manufacturer`+`model` a helyes pár
+
+`jobs/[id]/page.tsx:35` `name` mezőt szelektál az `equipment` táblából. A tábla csak `manufacturer`, `model`, `kind` stb. oszlopokat tartalmaz — más selektek (`dashboard`, `customers/[id]`) ezt megerősítik. Az `{e.name}` mindig üres.
+
+**Why:** Első megtalálva 2026-06-28 statikus QA-ban.
+
+**How to apply:** Flag as BLOKKOLÓ ha `equipment` select `name` mezőt tartalmaz. Helyes: `manufacturer` + `model` konkatenáció a display stringhez.
+
+---
+
+## `canEdit` prop nem kerül át `QuoteEditor`-ba
+
+`jobs/[id]/quote/page.tsx` kiszámolja `canEdit`-et, de nem adja át a `<QuoteEditor>` komponensnek. Szerkesztési jogosultság-kontroll hiányzik.
+
+**Why:** 2026-06-28 static QA.
+
+**How to apply:** Flag as JAVASOLT ha page-szintű `canEdit` nem propagálódik a kliens-komponensbe.
+
+---
+
+## `services.duration_min` vs `default_duration_min` — oszlopnév-inkonzisztencia
+
+`settings/services/page.tsx` `default_duration_min`-t szelektál; `calendar/page.tsx` és `booking/actions.ts` `duration_min`-t vár. Az eltérés egyiket null-lal hagyja.
+
+**Why:** 2026-06-28 cross-file static QA.
+
+**How to apply:** Flag as JAVASOLT/BLOKKOLÓ — ellenőrizd a migrációban a valódi oszlopnevet és egységesítsd minden select-ben.
+
+---
+
+## `createBooking` hiányzó revalidatePath-ek
+
+`booking/actions.ts:88` csak `/calendar` + `/dashboard`; hiányzik `/jobs` és `/customers/${customerId}`.
+
+**Why:** 2026-06-28 static QA.
+
+**How to apply:** Flag as JAVASOLT. Foglalás után a munkálista + ügyfélprofil elavult marad.
+
+---
+
 ## ConfirmDelete dialog can be dismissed via ESC/backdrop while loading
 
 `components/common/ConfirmDelete.tsx` passes `onOpenChange` directly to `<Dialog>` without guarding against close events while `loading=true`. This means the dialog can be ESC-closed mid-operation, leaving the delete in flight with no UI feedback.

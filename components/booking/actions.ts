@@ -86,6 +86,8 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");
+  revalidatePath("/jobs");
+  revalidatePath(`/customers/${customerId}`);
   return { jobId: job.id };
 }
 
