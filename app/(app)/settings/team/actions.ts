@@ -107,7 +107,16 @@ export async function addTechnician(formData: FormData) {
   }
 
   revalidatePath("/settings/team");
-  return { success: true };
+  return {
+    success: true,
+    member: {
+      user_id: userId,
+      role: "technician" as const,
+      is_active: true,
+      trades,
+      profiles: { full_name: parsed.data.full_name, phone: parsed.data.phone ?? null },
+    },
+  };
 }
 
 export async function updateTechnicianTrades(userId: string, trades: string[]) {

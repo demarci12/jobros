@@ -163,6 +163,9 @@ export function TeamClient({ members: initialMembers, canManage, currentUserId }
       if (result?.error) toast.error(result.error);
       else {
         toast.success("Szerelő hozzáadva. Beléphet az e-mail + jelszóval.");
+        if ("member" in result && result.member) {
+          setMembers(prev => [...prev, result.member as Member]);
+        }
         (e.target as HTMLFormElement).reset();
         setDirectTrades(["klima"]);
         setAddMode("none");
