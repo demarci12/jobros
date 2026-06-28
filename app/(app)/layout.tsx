@@ -8,6 +8,16 @@ import { AppShell } from "@/components/shell/app-shell";
 async function ensureCompany(userId: string, email: string) {
   const service = createServiceClient();
 
+  // Check if user already belongs to a company (race-safe early exit)
+  const { data: existing } = await service
+    .from("company_users")
+    .select("company_id")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (existing) return; // already set up (e.g. by a concurrent tab)
+
   // Derive company name from email
   const companyName = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " Kft.";
 

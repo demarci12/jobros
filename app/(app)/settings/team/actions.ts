@@ -14,6 +14,12 @@ async function getOwnerOrDispatcherCtx() {
   return { supabase: ctx.supabase, user: ctx.user, companyId: ctx.companyId, role: ctx.role };
 }
 
+async function getOwnerCtx() {
+  const ctx = await getAuthContext();
+  if (!ctx || ctx.role !== "owner") return null;
+  return { supabase: ctx.supabase, user: ctx.user, companyId: ctx.companyId, role: ctx.role };
+}
+
 export async function inviteMember(formData: FormData) {
   const ctx = await getOwnerOrDispatcherCtx();
   if (!ctx) return { error: "Nincs jogosultságod." };
@@ -137,8 +143,8 @@ export async function updateTechnicianTrades(userId: string, trades: string[]) {
 }
 
 export async function changeRole(formData: FormData) {
-  const ctx = await getOwnerOrDispatcherCtx();
-  if (!ctx) return { error: "Nincs jogosultságod." };
+  const ctx = await getOwnerCtx();
+  if (!ctx) return { error: "Nincs jogosultságod. Csak a tulajdonos módosíthat szerepköröket." };
 
   const parsed = roleSchema.safeParse({
     userId: formData.get("userId"),
@@ -161,8 +167,8 @@ export async function changeRole(formData: FormData) {
 }
 
 export async function deactivateMember(formData: FormData) {
-  const ctx = await getOwnerOrDispatcherCtx();
-  if (!ctx) return { error: "Nincs jogosultságod." };
+  const ctx = await getOwnerCtx();
+  if (!ctx) return { error: "Nincs jogosultságod. Csak a tulajdonos távolíthat el tagot." };
 
   const userIdRaw = z.string().uuid().safeParse(formData.get("userId"));
   if (!userIdRaw.success) return { error: "Érvénytelen userId." };

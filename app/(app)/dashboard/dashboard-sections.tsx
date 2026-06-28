@@ -23,23 +23,20 @@ export async function KpiCards() {
   const [
     { data: invoicesThisMonth },
     { data: invoicesLastMonth },
-    { data: outstandingInvoices },
     openJobsResult,
   ] = await Promise.all([
     supabase.from("invoices").select("gross_total").eq("company_id", companyId).gte("created_at", monthStart),
     supabase.from("invoices").select("gross_total").eq("company_id", companyId).gte("created_at", prevMonthStart).lt("created_at", monthStart),
-    supabase.from("invoices").select("gross_total").eq("company_id", companyId).eq("nav_status", "szamlazva").limit(20),
     supabase.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", companyId).in("status", ["uj", "elfogadva", "folyamatban"]).is("deleted_at", null),
   ]);
 
   const revenueMonth = (invoicesThisMonth ?? []).reduce((s, i) => s + (i.gross_total ?? 0), 0);
   const revenuePrev = (invoicesLastMonth ?? []).reduce((s, i) => s + (i.gross_total ?? 0), 0);
-  const outstandingTotal = (outstandingInvoices ?? []).reduce((s, i) => s + (i.gross_total ?? 0), 0);
   const revDiff = revenuePrev > 0 ? Math.round(((revenueMonth - revenuePrev) / revenuePrev) * 100) : null;
   const openCount = (openJobsResult as any)?.count ?? 0;
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
       <Card>
         <CardHeader className="pb-1 pt-4 px-4">
           <CardTitle className="text-xs text-muted-foreground font-normal uppercase tracking-wide">Bevétel (hónap)</CardTitle>
@@ -51,16 +48,6 @@ export async function KpiCards() {
               {revDiff >= 0 ? "+" : ""}{revDiff}% előző hónaphoz
             </p>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className={outstandingTotal > 0 ? "border-orange-200" : undefined}>
-        <CardHeader className="pb-1 pt-4 px-4">
-          <CardTitle className="text-xs text-muted-foreground font-normal uppercase tracking-wide">Kintlévőség</CardTitle>
-        </CardHeader>
-        <CardContent className="px-4 pb-4">
-          <p className={`text-2xl font-bold ${outstandingTotal > 0 ? "text-orange-600" : ""}`}>{fmt(outstandingTotal)}</p>
-          <p className="text-xs text-muted-foreground mt-1">{(outstandingInvoices ?? []).length} számla</p>
         </CardContent>
       </Card>
 

@@ -31,6 +31,7 @@ export function BookingDropup({
   technicians,
   equipment,
   existingAppointments,
+  bookingMode,
   defaultSlotDurationMin,
   workingHours,
 }: {
@@ -43,6 +44,7 @@ export function BookingDropup({
   technicians: Technician[];
   equipment: Equipment[];
   existingAppointments: Appointment[];
+  // TODO: render SmartSlotPicker when bookingMode === "smart" (Phase 2 dispatch — VROOM/OSRM)
   bookingMode: "smart" | "manual";
   defaultSlotDurationMin: number;
   workingHours: Record<string, { open: boolean; start: string; end: string }>;
