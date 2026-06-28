@@ -61,14 +61,11 @@ export async function addQuoteLine(quoteId: string, jobId: string, formData: For
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const lineTotal = parsed.data.quantity * parsed.data.unit_price;
-
   const { data, error } = await ctx.supabase.from("quote_lines").insert({
     company_id: ctx.companyId,
     quote_id: quoteId,
     ...parsed.data,
     option_group: parsed.data.option_group || null,
-    line_total: lineTotal,
   }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_optional, option_group, is_selected").single();
 
   if (error) return { error: error.message };
