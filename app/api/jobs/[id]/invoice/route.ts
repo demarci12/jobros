@@ -95,7 +95,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
 
   // Job státusz → szamlazva (státuszgép már validálta)
-  await service.from("jobs").update({ status: "szamlazva" }).eq("id", jobId);
+  const { error: statusErr } = await service.from("jobs").update({ status: "szamlazva" }).eq("id", jobId);
+  if (statusErr) return NextResponse.json({ error: "Számla kiállítva, de státuszfrissítés sikertelen: " + statusErr.message }, { status: 500 });
 
   return NextResponse.json({ invoice });
 }

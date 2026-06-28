@@ -152,8 +152,9 @@ export async function deactivateMember(formData: FormData) {
   const ctx = await getOwnerOrDispatcherCtx();
   if (!ctx) return { error: "Nincs jogosultságod." };
 
-  const userId = formData.get("userId") as string;
-  if (!userId) return { error: "Hiányzó userId." };
+  const userIdRaw = z.string().uuid().safeParse(formData.get("userId"));
+  if (!userIdRaw.success) return { error: "Érvénytelen userId." };
+  const userId = userIdRaw.data;
   if (userId === ctx.user.id) return { error: "Saját magad nem távolíthatod el." };
 
   const { error } = await ctx.supabase
@@ -171,8 +172,9 @@ export async function reactivateMember(formData: FormData) {
   const ctx = await getOwnerOrDispatcherCtx();
   if (!ctx) return { error: "Nincs jogosultságod." };
 
-  const userId = formData.get("userId") as string;
-  if (!userId) return { error: "Hiányzó userId." };
+  const userIdRaw = z.string().uuid().safeParse(formData.get("userId"));
+  if (!userIdRaw.success) return { error: "Érvénytelen userId." };
+  const userId = userIdRaw.data;
 
   const ent = await checkEntitlement(ctx.companyId, "technicians");
   if (!ent.allowed) return { error: "Elérted a szerelő-limitet." };

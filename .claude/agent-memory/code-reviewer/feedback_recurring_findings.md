@@ -129,13 +129,43 @@ As of T-01b scaffold there is NO `middleware.ts` and NO session check in `app/(a
 
 ---
 
-## Status machine bypass invoice route-ban
+## Status machine bypass invoice route-ban — RESOLVED (2026-06-28)
 
-`app/api/jobs/[id]/invoice/route.ts:89` közvetlenül `service.from("jobs").update({ status: "szamlazva" })` — nem hívja az `assertTransition` függvényt a `lib/jobs/status-machine.ts`-ből. CLAUDE.md vasszabály: "Státusz-váltás MINDIG a status-machine-en át." Jelen esetben a sor előtt van `job.status !== "kesz"` ellenőrzés, tehát a `kesz → szamlazva` átmenet logikailag helyes, de a gépen való átmenetelés kötelező.
+`app/api/jobs/[id]/invoice/route.ts` most már hívja az `assertTransition`-t (sor 76–80) a státuszfrissítés előtt. A vasszabály teljesül. Az update error azonban még mindig nincs elkapva (sor 98) — a job status silent failure-t szenvedhet. Lásd: "invoice route job update error dropped" bejegyzést.
 
-**Why:** Első megtalálva full-stack review-ban 2026-06-27.
+**Why:** Első megtalálva full-stack review-ban 2026-06-27, javítva 2026-06-28-as PR-ban.
 
 **How to apply:** Flag as BLOKKOLÓ ha bármely route/action közvetlenül írja a `jobs.status` mezőt `assertTransition` meghívása nélkül.
+
+---
+
+## invoice route: job status update error eldobva
+
+`app/api/jobs/[id]/invoice/route.ts:98` — `await service.from("jobs").update(...)` return értéke elvész. Ha a DB update sikertelen, a számla létezik de a job "kesz"-ben marad.
+
+**Why:** Első megtalálva 2026-06-28 backend review-ban.
+
+**How to apply:** Flag as CRITICAL ha bármely state-changing DB update (különösen idempotens flow-ban) nem ellenőrzi a hibát.
+
+---
+
+## FormData zod bypass: deactivateMember / reactivateMember
+
+`settings/team/actions.ts:155, 173` — `userId` FormData-ból közvetlenül string-cast, zod uuid validáció nélkül. CLAUDE.md: "Minden mutáció zod-dal validál a határon."
+
+**Why:** Első megtalálva 2026-06-28 backend review-ban.
+
+**How to apply:** Flag as CRITICAL ha FormData field-et zod nélkül cast-olnak és DB-be küldik.
+
+---
+
+## sendNotification try-catch hiányzik loop-ban (billing-lifecycle cron)
+
+`app/api/cron/billing-lifecycle/route.ts:78` — `await sendNotification(...)` nincs try-catch-ben. Egy dobó connector az egész cron-t megöli, a többi cég nem kap értesítést.
+
+**Why:** Első megtalálva 2026-06-28 backend review-ban.
+
+**How to apply:** Flag as WARNING ha async connector hívás for/forEach loopban nincs try-catch-be csomagolva.
 
 ---
 

@@ -61,6 +61,17 @@ T-01 inicializálás auditálva: 2026-06-26.
 - `service_role` kulcs: `lib/supabase/service.ts` `import "server-only"` guard megvan, kliens komponens nem importálja. Rendben.
 - Trigger függvények `generate_job_number`, `log_job_status_change`, `bump_next_service` (0008): hiányzó `SET search_path = ''`. Nem SECURITY DEFINER, de ajánlott.
 
+**Teljes migráció audit (2026-06-28): 0018–0026**
+
+- `increment_stock` (0018): KRITIKUS — SECURITY DEFINER függvény, SET search_path = public, de nincs tenant ownership ellenőrzés. Bármely `authenticated` user hívhatja bármely `material_id`-vel, RLS-t megkerüli. Fix: explicit company ownership check a függvény belsejében.
+- `bump_next_service` trigger (0008): FIGYELEM — nincs SECURITY DEFINER, nincs SET search_path. Technikus (role=technician) job 'kesz' státuszba vált → trigger UPDATE equipment-et hív → equipment_update policy csak owner/dispatcher-nek engedélyez → trigger RLS-megtagadással rollback-et okoz. Technikus nem tudja lezárni a munkát.
+- `log_job_status_change` (0008→0024): volt: nincs SECURITY DEFINER, jsh INSERT policy nélküli táblán írt (hibás). Javítva 0024-ben: SECURITY DEFINER trigger, auth.uid() session context öröklődik. Helyes.
+- `booking_requests` INSERT (0021): nincs kliens INSERT policy — szándékos, service_role API route (app/public/) megy át, dokumentálva. Biztonságos.
+- `job_status_history` (0024 fix): confirmed helyes — SECURITY DEFINER trigger, SELECT-only kliens policy, nincs kliens INSERT.
+- Schema prefix hiány (0006–0015 folytatás): 0019–0020 helyesen public. prefixet használ; 0021 szintén. 0026 csak DDL, nincs policy.
+- `time_entries` (0019): nincs DELETE policy — szándékos audit trail, de nem dokumentált a migrációban.
+- `generate_job_number` (0008): nincs SECURITY DEFINER, nincs SET search_path. Nem adatszivárgás, de bármely user hívhatja idegen company_id-vel, rossz szekvenciát generálva.
+
 **Visszatérő kockázati pont a jövőben:**
 - Minden új kliens komponens (`'use client'`) létrehozásakor ellenőrizni kell, hogy nem importál-e `lib/supabase/service.ts`-t.
 - Minden új migrációban `company_id` szűrés + RLS engedélyezés + `public.` schema prefix kötelező.
