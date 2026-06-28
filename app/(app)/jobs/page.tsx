@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/common/EmptyState";
 import { Briefcase } from "lucide-react";
@@ -9,27 +9,22 @@ import { STATUS_LABELS, STATUS_COLORS, type JobStatus } from "@/lib/jobs/status-
 const STATUS_FILTERS: JobStatus[] = ["uj","felmeres","arajanlat","utemezve","folyamatban","kesz","szamlazva"];
 
 export default async function JobsPage({ searchParams }: { searchParams: { status?: string } }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role, user } = ctx;
 
   const activeStatus = searchParams.status as JobStatus | undefined;
 
   let query = supabase
     .from("jobs")
     .select("id, job_number, title, status, created_at, customers(name), services(name), sites(address, city, zip)")
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(100);
 
   if (activeStatus) query = query.eq("status", activeStatus);
-  if (cu.role === "technician") query = query.eq("assigned_to", user.id);
+  if (role === "technician") query = query.eq("assigned_to", user.id);
 
   const { data: jobs } = await query;
 

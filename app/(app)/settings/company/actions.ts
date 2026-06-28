@@ -1,27 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { companySchema } from "@/lib/validators/settings";
 
-async function getOwnerCompanyId() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (!cu || cu.role !== "owner") return null;
-  return cu.company_id as string;
-}
-
 export async function updateCompany(formData: FormData) {
-  const companyId = await getOwnerCompanyId();
-  if (!companyId) return { error: "Csak az owner szerkesztheti a cégadatokat." };
+  const ctx = await getAuthContext();
+  if (!ctx || ctx.role !== "owner") return { error: "Csak az owner szerkesztheti a cégadatokat." };
+  const { supabase, companyId } = ctx;
 
   const rawSlug = (formData.get("public_slug") as string || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
 
@@ -34,7 +20,6 @@ export async function updateCompany(formData: FormData) {
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const supabase = createClient();
   const { error } = await supabase
     .from("companies")
     .update({

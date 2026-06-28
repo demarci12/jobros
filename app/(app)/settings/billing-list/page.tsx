@@ -1,19 +1,14 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { BillingListClient } from "@/components/billing/BillingListClient";
 
 export default async function BillingListPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   // Only owner or accountant-level (owner/dispatcher) can view
-  if (!["owner", "dispatcher"].includes(cu.role)) redirect("/dashboard");
+  if (!["owner", "dispatcher"].includes(role)) redirect("/dashboard");
 
   const { data: invoices } = await supabase
     .from("invoices")
@@ -25,7 +20,7 @@ export default async function BillingListPage() {
         customers (name)
       )
     `)
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .order("created_at", { ascending: false })
     .limit(500);
 
@@ -40,7 +35,7 @@ export default async function BillingListPage() {
       </div>
       <BillingListClient
         initialInvoices={(invoices ?? []) as any}
-        companyId={cu.company_id}
+        companyId={companyId}
       />
     </div>
   );

@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { AccountForm } from "./account-form";
 
 export default async function AccountPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, user } = ctx;
 
   const { data: profile } = await supabase
     .from("profiles")

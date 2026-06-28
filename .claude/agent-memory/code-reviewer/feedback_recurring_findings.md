@@ -295,6 +295,26 @@ Rendszerszintű minta: a job-mutáló Server Actionök (lib/jobs/actions.ts) nem
 
 ---
 
+## `customers/[id]/page.tsx` — `upcomingAppts` korlátlan lekérés
+
+`customers/[id]/page.tsx:57` — `appointments` lekérésnél nincs `.limit()`. Nagy tenant esetén ez az összes jövőbeni időpontot letölti csak az ütközésvizsgálathoz. Hozzáadandó `.limit(200)`.
+
+**Why:** Performance audit 2026-06-28 feltárta; booking dialógus néhány hétre előre néz.
+
+**How to apply:** Flag as HIGH ha bármely "collision check" query nem limitel.
+
+---
+
+## `generateJobNumber` race condition — `lib/jobs/actions.ts` is érintett
+
+A job-number race condition nemcsak `booking/actions.ts`-ben (már dokumentálva), hanem `lib/jobs/actions.ts:54-60`-ban is fennáll. Mindkét helyen COUNT + 1 pattern.
+
+**Why:** Performance audit 2026-06-28 — lib/jobs/actions.ts nem volt korábban auditra szánva.
+
+**How to apply:** Azonos megoldás: DB sequence vagy atomikus counter tábla. Flag as HIGH mindkét helyen.
+
+---
+
 ## ConfirmDelete dialog can be dismissed via ESC/backdrop while loading
 
 `components/common/ConfirmDelete.tsx` passes `onOpenChange` directly to `<Dialog>` without guarding against close events while `loading=true`. This means the dialog can be ESC-closed mid-operation, leaving the delete in flight with no UI feedback.

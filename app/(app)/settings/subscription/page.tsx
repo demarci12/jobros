@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { SubscriptionClient } from "./subscription-client";
 
@@ -8,20 +8,9 @@ export default async function SubscriptionPage({
 }: {
   searchParams: { success?: string; canceled?: string };
 }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { companyId, role } = ctx;
 
   const service = createServiceClient();
 
@@ -29,7 +18,7 @@ export default async function SubscriptionPage({
     service
       .from("subscriptions")
       .select("*, plan_definitions(name, price_monthly, price_yearly, features, max_technicians)")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .maybeSingle(),
     service
       .from("plan_definitions")
@@ -43,7 +32,7 @@ export default async function SubscriptionPage({
     <SubscriptionClient
       sub={sub}
       plans={plans ?? []}
-      role={cu.role}
+      role={role}
       success={searchParams.success === "1"}
       canceled={searchParams.canceled === "1"}
     />

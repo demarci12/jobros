@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { NotificationsClient } from "./notifications-client";
 import { DEFAULT_TEMPLATES } from "@/lib/notifications/templates";
 import type { NotificationEvent } from "@/lib/notifications/templates";
@@ -15,19 +15,14 @@ const EVENT_LABELS: Record<NotificationEvent, string> = {
 };
 
 export default async function NotificationsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const { data: dbSettings } = await supabase
     .from("notification_settings")
     .select("event, is_enabled, channels, template")
-    .eq("company_id", cu.company_id);
+    .eq("company_id", companyId);
 
   const settingsMap = Object.fromEntries((dbSettings ?? []).map(s => [s.event, s]));
 
@@ -41,7 +36,7 @@ export default async function NotificationsPage() {
     defaultTemplate: DEFAULT_TEMPLATES[event],
   }));
 
-  const canEdit = cu.role === "owner";
+  const canEdit = role === "owner";
 
   return (
     <div className="space-y-6 max-w-2xl">

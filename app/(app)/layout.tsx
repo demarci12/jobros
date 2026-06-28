@@ -1,21 +1,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AppShell } from "@/components/shell/app-shell";
 
 async function ensureCompany(userId: string, email: string) {
   const service = createServiceClient();
-
-  // Check again with service role to avoid RLS timing issues
-  const { data: existing } = await service
-    .from("company_users")
-    .select("company_id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (existing) return;
 
   // Derive company name from email
   const companyName = email.split("@")[0].replace(/[._-]/g, " ").replace(/\b\w/g, c => c.toUpperCase()) + " Kft.";
@@ -46,20 +37,14 @@ async function ensureCompany(userId: string, email: string) {
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-
-  if (!cu) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
+    // Could be not logged in, or logged in but no company yet
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) redirect("/login");
     await ensureCompany(user.id, user.email ?? "felhasznalo");
+    redirect("/dashboard");
   }
 
   return (

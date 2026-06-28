@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { CalendarShell } from "@/components/calendar/CalendarShell";
 
 const DEFAULT_WORKING_HOURS = {
@@ -17,14 +17,9 @@ export default async function CalendarPage({
 }: {
   searchParams: { view?: string; month?: string };
 }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const view = searchParams.view ?? "week";
 
@@ -56,7 +51,7 @@ export default async function CalendarPage({
           sites (lat, lng, address)
         )
       `)
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .neq("status", "lemondva")
       .gte("starts_at", from.toISOString())
       .lte("starts_at", to.toISOString())
@@ -65,21 +60,21 @@ export default async function CalendarPage({
     supabase
       .from("company_users")
       .select("user_id, profiles(id, full_name)")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .eq("role", "technician")
       .eq("is_active", true),
 
     supabase
       .from("services")
       .select("id, name, duration_min")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .eq("is_active", true)
       .order("name"),
 
     supabase
       .from("booking_settings")
       .select("default_slot_duration_min, working_hours")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .maybeSingle(),
   ]);
 
@@ -98,7 +93,7 @@ export default async function CalendarPage({
         initialAppointments={(appointments ?? []) as any}
         technicians={techList}
         services={(services ?? []) as any}
-        companyId={cu.company_id}
+        companyId={companyId}
         mapboxToken={mapboxToken}
         initialView={view as "week" | "month" | "map"}
         initialMonth={searchParams.month}

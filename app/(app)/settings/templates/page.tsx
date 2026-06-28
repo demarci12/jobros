@@ -1,23 +1,18 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { TemplatesClient } from "@/components/jobs/TemplatesClient";
 
 export default async function TemplatesPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
-
-  const canEdit = ["owner", "dispatcher"].includes(cu.role);
+  const canEdit = ["owner", "dispatcher"].includes(role);
 
   const [{ data: templates }, { data: enums }] = await Promise.all([
     supabase.from("job_templates")
       .select("id, name, activity, checklist_items(id, label, sort_order, is_required)")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .order("name"),
     // activity enum values derived from the rendszerterv — static list
     Promise.resolve({ data: null }),

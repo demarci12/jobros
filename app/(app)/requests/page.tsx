@@ -1,28 +1,23 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { RequestsClient } from "@/components/requests/RequestsClient";
 
 export default async function RequestsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
-
-  if (!["owner", "dispatcher"].includes(cu.role)) redirect("/dashboard");
+  if (!["owner", "dispatcher"].includes(role)) redirect("/dashboard");
 
   const [{ data: requests }, { data: company }] = await Promise.all([
     supabase.from("booking_requests")
       .select("id, name, phone, email, address, message, status, job_id, created_at, services(name)")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .order("created_at", { ascending: false })
       .limit(100),
     supabase.from("companies")
       .select("public_slug")
-      .eq("id", cu.company_id)
+      .eq("id", companyId)
       .maybeSingle(),
   ]);
 
@@ -45,7 +40,7 @@ export default async function RequestsPage() {
       </div>
       <RequestsClient
         initialRequests={(requests ?? []) as any}
-        companyId={cu.company_id}
+        companyId={companyId}
       />
     </div>
   );

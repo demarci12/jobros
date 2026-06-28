@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
   stripe,
@@ -13,33 +13,23 @@ import {
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 
 async function getCompanyAndSub() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (!cu) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
 
   const service = createServiceClient();
   const { data: company } = await service
     .from("companies")
     .select("id, name, email")
-    .eq("id", cu.company_id)
+    .eq("id", ctx.companyId)
     .single();
 
   const { data: sub } = await service
     .from("subscriptions")
     .select("*")
-    .eq("company_id", cu.company_id)
+    .eq("company_id", ctx.companyId)
     .maybeSingle();
 
-  return { company, sub, role: cu.role };
+  return { company, sub, role: ctx.role };
 }
 
 export async function startCheckout(planSlug: string) {

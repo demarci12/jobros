@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { CustomerHeader } from "@/components/crm/CustomerHeader";
 import { SitesList } from "@/components/crm/SitesList";
 import { BookingButton } from "@/components/booking/BookingButton";
@@ -9,52 +9,47 @@ import { STATUS_LABELS, STATUS_COLORS } from "@/lib/jobs/status-machine";
 import type { JobStatus } from "@/lib/jobs/status-machine";
 
 export default async function CustomerPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const { data: customer } = await supabase
     .from("customers")
     .select("id, name, phone, email, tax_number, notes, is_company, deleted_at")
-    .eq("id", params.id).eq("company_id", cu.company_id).maybeSingle();
+    .eq("id", params.id).eq("company_id", companyId).maybeSingle();
   if (!customer) notFound();
 
   const { data: sites } = await supabase
     .from("sites")
     .select("id, label, address, city, zip, access_notes, lat, lng")
-    .eq("customer_id", params.id).eq("company_id", cu.company_id)
+    .eq("customer_id", params.id).eq("company_id", companyId)
     .order("created_at");
 
   const { data: equipment } = await supabase
     .from("equipment")
     .select("id, kind, manufacturer, model, serial_number, installed_at, warranty_until, next_service_due, notes, site_id")
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .in("site_id", (sites ?? []).map(s => s.id))
     .order("created_at");
 
-  const canEdit = ["owner", "dispatcher"].includes(cu.role);
+  const canEdit = ["owner", "dispatcher"].includes(role);
 
   // Job előzmények
   const { data: jobs } = await supabase
     .from("jobs")
     .select("id, job_number, title, status, created_at, services(name)")
     .eq("customer_id", params.id)
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
     .limit(50);
 
   // Booking data
   const [{ data: services }, { data: technicians }, { data: company }, { data: upcomingAppts }] = await Promise.all([
-    supabase.from("services").select("id, name, duration_min").eq("company_id", cu.company_id).eq("is_active", true).order("sort_order"),
-    supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", cu.company_id).eq("role", "technician").eq("is_active", true),
-    supabase.from("companies").select("booking_mode, default_slot_duration_min, working_hours").eq("id", cu.company_id).single(),
-    supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", cu.company_id).gte("starts_at", new Date().toISOString()).neq("status", "lemondva"),
+    supabase.from("services").select("id, name, duration_min").eq("company_id", companyId).eq("is_active", true).order("sort_order"),
+    supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", companyId).eq("role", "technician").eq("is_active", true),
+    supabase.from("companies").select("booking_mode, default_slot_duration_min, working_hours").eq("id", companyId).single(),
+    supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", companyId).gte("starts_at", new Date().toISOString()).neq("status", "lemondva"),
   ]);
 
   const techList = (technicians ?? []).map((t: any) => ({ id: t.profiles?.id ?? t.user_id, name: t.profiles?.full_name ?? "Szerelő" }));

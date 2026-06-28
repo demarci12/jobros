@@ -1,25 +1,20 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { ZonesClient } from "./zones-client";
 
 export default async function ZonesPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const [{ data: zones }, { data: technicians }] = await Promise.all([
     supabase.from("service_zones")
       .select("id, name, technician_id, home_lat, home_lng, radius_km, is_active")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .order("created_at"),
     supabase.from("company_users")
       .select("user_id, profiles(id, full_name)")
-      .eq("company_id", cu.company_id)
+      .eq("company_id", companyId)
       .eq("role", "technician")
       .eq("is_active", true),
   ]);
@@ -29,7 +24,7 @@ export default async function ZonesPage() {
     name: t.profiles?.full_name ?? "Szerelő",
   }));
 
-  const canEdit = ["owner", "dispatcher"].includes(cu.role);
+  const canEdit = ["owner", "dispatcher"].includes(role);
 
   return (
     <div className="space-y-4">

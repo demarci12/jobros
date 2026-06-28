@@ -1,21 +1,16 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { BookingSettingsClient } from "./booking-settings-client";
 
 export default async function BookingSettingsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const { data: company } = await supabase
     .from("companies")
     .select("booking_mode, default_slot_duration_min, working_hours")
-    .eq("id", cu.company_id)
+    .eq("id", companyId)
     .single();
 
   const defaultHours = {

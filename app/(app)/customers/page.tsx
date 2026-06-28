@@ -1,28 +1,23 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/common/EmptyState";
 import { AddCustomerButton } from "./customers-client";
 import { Users, Phone } from "lucide-react";
 
 export default async function CustomersPage({ searchParams }: { searchParams: { q?: string } }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
-
-  const canEdit = ["owner", "dispatcher"].includes(cu.role);
+  const canEdit = ["owner", "dispatcher"].includes(role);
   const q = searchParams.q?.trim() ?? "";
 
   let query = supabase
     .from("customers")
     .select("id, name, phone, email, sites(address, city, zip)")
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .is("deleted_at", null)
     .order("name")
     .limit(50);

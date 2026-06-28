@@ -1,19 +1,14 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { User, MapPin, Wrench, Calendar } from "lucide-react";
 import { type JobStatus } from "@/lib/jobs/status-machine";
 
 export default async function JobOverviewPage({ params }: { params: { id: string } }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role } = ctx;
 
   const { data: job } = await supabase
     .from("jobs")
@@ -24,7 +19,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
       services(name)
     `)
     .eq("id", params.id)
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .maybeSingle();
   if (!job) notFound();
 
