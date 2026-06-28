@@ -1,12 +1,14 @@
 "use server";
 
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
+import { revalidatePath } from "next/cache";
 
 const CreateBookingSchema = z.object({
   customerId: z.string().uuid(),
   siteId: z.string().uuid(),
   serviceId: z.string().uuid().nullable(),
+  equipmentId: z.string().uuid().nullable(),
   title: z.string().max(255).nullable(),
   kind: z.enum(["munka", "felmeres"]),
   technicianId: z.string().uuid().nullable(),
@@ -17,16 +19,12 @@ const CreateBookingSchema = z.object({
 export async function createBooking(input: z.infer<typeof CreateBookingSchema>) {
   const parsed = CreateBookingSchema.safeParse(input);
   if (!parsed.success) return { error: "Érvénytelen adatok: " + parsed.error.issues[0]?.message };
-  const { customerId, siteId, serviceId, title, kind, technicianId, startsAt, endsAt } = parsed.data;
+  const { customerId, siteId, serviceId, equipmentId, title, kind, technicianId, startsAt, endsAt } = parsed.data;
 
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Nincs jogosultság." };
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu || !["owner", "dispatcher"].includes(cu.role)) return { error: "Nincs jogosultság." };
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
+  const { supabase, companyId, user } = ctx;
+  const cu = { company_id: companyId, role: ctx.role };
 
   // Conflict check
   if (technicianId) {
@@ -60,6 +58,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       customer_id: customerId,
       site_id: siteId,
       service_id: serviceId,
+      equipment_id: equipmentId,
       title,
       assigned_to: technicianId,
       created_by: user.id,
@@ -83,5 +82,45 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
 
   if (apptError) return { error: apptError.message };
 
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { jobId: job.id };
+}
+
+// Keresés az ügyfél-választóhoz (naptárból indított foglaláskor)
+export async function searchCustomers(query: string) {
+  const ctx = await getAuthContext();
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("customers")
+    .select("id, name, phone")
+    .eq("company_id", ctx.companyId)
+    .is("deleted_at", null)
+    .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+    .order("name")
+    .limit(10);
+  return data ?? [];
+}
+
+// Ügyfél helyszíneinek + berendezéseinek lekérése
+export async function getCustomerSitesAndEquipment(customerId: string) {
+  const ctx = await getAuthContext();
+  if (!ctx) return { sites: [], equipment: [] };
+  const [{ data: sites }, { data: equipment }] = await Promise.all([
+    ctx.supabase
+      .from("sites")
+      .select("id, address, city")
+      .eq("company_id", ctx.companyId)
+      .eq("customer_id", customerId)
+      .is("deleted_at", null)
+      .order("address"),
+    ctx.supabase
+      .from("equipment")
+      .select("id, manufacturer, model, kind, site_id")
+      .eq("company_id", ctx.companyId)
+      .eq("customer_id", customerId)
+      .is("deleted_at", null)
+      .order("manufacturer"),
+  ]);
+  return { sites: sites ?? [], equipment: equipment ?? [] };
 }

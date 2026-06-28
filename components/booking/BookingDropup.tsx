@@ -26,6 +26,7 @@ type Site = { id: string; address: string; city: string | null };
 type Service = { id: string; name: string; duration_min: number | null };
 type Technician = { id: string; name: string };
 type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };
+type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
 
 export function BookingDropup({
   open,
@@ -35,6 +36,7 @@ export function BookingDropup({
   sites,
   services,
   technicians,
+  equipment,
   existingAppointments,
   bookingMode,
   defaultSlotDurationMin,
@@ -47,6 +49,7 @@ export function BookingDropup({
   sites: Site[];
   services: Service[];
   technicians: Technician[];
+  equipment: Equipment[];
   existingAppointments: Appointment[];
   bookingMode: "smart" | "manual";
   defaultSlotDurationMin: number;
@@ -56,9 +59,12 @@ export function BookingDropup({
   const [step, setStep] = useState<"setup" | "slot">("setup");
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
+  const [equipmentId, setEquipmentId] = useState<string>("");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"munka" | "felmeres">("munka");
   const [isPending, startTransition] = useTransition();
+
+  const siteEquipment = equipment.filter(e => !e.site_id || e.site_id === siteId);
 
   const selectedService = services.find(s => s.id === serviceId);
   const durationMin = selectedService?.duration_min ?? defaultSlotDurationMin;
@@ -69,6 +75,7 @@ export function BookingDropup({
         customerId,
         siteId,
         serviceId: serviceId || null,
+        equipmentId: equipmentId || null,
         title: title || selectedService?.name || null,
         kind,
         technicianId,
@@ -97,7 +104,7 @@ export function BookingDropup({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label>Telephely</Label>
-                <Select value={siteId} onValueChange={v => v && setSiteId(v)}>
+                <Select value={siteId} onValueChange={v => setSiteId(v ?? "")}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {sites.map(s => (
@@ -135,7 +142,22 @@ export function BookingDropup({
               </div>
 
               <div className="space-y-1.5">
-                <Label>Cím (opcionális)</Label>
+                <Label>Berendezés (opcionális)</Label>
+                <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="— nincs —" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none">— nincs —</SelectItem>
+                    {siteEquipment.map(e => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Megnevezés (opcionális)</Label>
                 <Input value={title} onChange={e => setTitle(e.target.value)}
                   placeholder={selectedService?.name ?? "Pl. Klíma szerviz"} />
               </div>

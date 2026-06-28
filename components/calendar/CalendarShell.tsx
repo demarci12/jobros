@@ -3,7 +3,8 @@
 import { useState, useCallback } from "react";
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, CalendarRange, Map } from "lucide-react";
+import { CalendarDays, CalendarRange, Map, CalendarPlus } from "lucide-react";
+import { CalendarBookingDialog } from "@/components/booking/CalendarBookingDialog";
 import { DispatchCalendar } from "./DispatchCalendar";
 import { MonthView } from "./MonthView";
 import dynamic from "next/dynamic";
@@ -45,25 +46,34 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+type Service = { id: string; name: string; duration_min: number | null };
+
 export function CalendarShell({
   initialAppointments,
   technicians,
+  services,
   companyId,
   mapboxToken,
   initialView,
   initialMonth,
+  defaultSlotDurationMin,
+  workingHours,
 }: {
   initialAppointments: Appointment[];
   technicians: { id: string; name: string }[];
+  services: Service[];
   companyId: string;
   mapboxToken: string;
   initialView: View;
   initialMonth?: string;
+  defaultSlotDurationMin: number;
+  workingHours: Record<string, { open: boolean; start: string; end: string }>;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [view, setView] = useState<View>(initialView);
   const [month, setMonth] = useState<Date>(() => {
     if (initialMonth) {
@@ -95,7 +105,12 @@ export function CalendarShell({
     <div className="flex flex-col h-full gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h1 className="text-xl font-semibold">Naptár</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-semibold">Naptár</h1>
+          <Button size="sm" onClick={() => setBookingOpen(true)}>
+            <CalendarPlus size={14} className="mr-1.5" /> Új foglalás
+          </Button>
+        </div>
 
         <div className="flex items-center gap-2">
           {/* Month nav — only in month view */}
@@ -163,6 +178,16 @@ export function CalendarShell({
           />
         )}
       </div>
+
+      <CalendarBookingDialog
+        open={bookingOpen}
+        onClose={() => setBookingOpen(false)}
+        services={services}
+        technicians={technicians}
+        existingAppointments={initialAppointments}
+        defaultSlotDurationMin={defaultSlotDurationMin}
+        workingHours={workingHours}
+      />
     </div>
   );
 }
