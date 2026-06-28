@@ -37,11 +37,13 @@ export function RequestForm({ companySlug, services }: { companySlug: string; se
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...form, slug: companySlug }),
       });
-      const json = await res.json();
-      if (!res.ok) { setError(json.error ?? "Hiba történt."); return; }
+      let json: Record<string, unknown> = {};
+      try { json = await res.json(); } catch { /* non-JSON response */ }
+      if (!res.ok) { setError((json.error as string) ?? `Szerverhiba (${res.status}). Kérjük, próbálja újra.`); return; }
       setDone(true);
-    } catch {
-      setError("Hálózati hiba. Kérjük, próbáld újra.");
+    } catch (err) {
+      console.error("Booking request error:", err);
+      setError("Hálózati hiba. Ellenőrizze az internetkapcsolatát és próbálja újra.");
     } finally {
       setSubmitting(false);
     }

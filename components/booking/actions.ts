@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 
 const CreateBookingSchema = z.object({
   customerId: z.string().uuid(),
-  siteId: z.string().uuid().nullable(),
+  siteId: z.string().uuid(),
   serviceId: z.string().uuid().nullable(),
   equipmentId: z.string().uuid().nullable(),
   title: z.string().max(255).nullable(),
@@ -56,7 +56,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       company_id: cu.company_id,
       job_number: jobNumber,
       customer_id: customerId,
-      site_id: siteId || null,
+      site_id: siteId,
       service_id: serviceId,
       equipment_id: equipmentId,
       title,

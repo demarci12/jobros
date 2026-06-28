@@ -47,7 +47,12 @@ export async function POST(req: NextRequest) {
 
   const { slug, name, phone, email, address, service_id, message } = parsed.data;
 
-  const service = createServiceClient();
+  let service: ReturnType<typeof createServiceClient>;
+  try {
+    service = createServiceClient();
+  } catch {
+    return NextResponse.json({ error: "Szerverhiba: a szolgáltatás jelenleg nem elérhető." }, { status: 503 });
+  }
 
   const { data: company } = await service
     .from("companies")
