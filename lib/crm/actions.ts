@@ -8,6 +8,13 @@ import { geocodeAddress } from "@/lib/geo/geocode";
 import { toH3 } from "@/lib/geo/h3";
 import { customerSchema, siteSchema, equipmentSchema } from "@/lib/validators/crm";
 
+async function geocodeWithTimeout(address: string, city?: string, zip?: string) {
+  return Promise.race([
+    geocodeAddress(address, city, zip),
+    new Promise<null>(resolve => setTimeout(() => resolve(null), 800)),
+  ]);
+}
+
 async function getCompanyCtx(roles = ["owner", "dispatcher"] as string[]) {
   const ctx = await getAuthContext();
   if (!ctx || !roles.includes(ctx.role)) return null;
@@ -45,18 +52,18 @@ export async function createQuickCustomer(formData: FormData) {
   if (!name) return { error: "Név kötelező." };
   if (!address) return { error: "Cím kötelező." };
 
-  const { data: customer, error: custErr } = await ctx.supabase
-    .from("customers")
-    .insert({ company_id: ctx.companyId, name, phone })
-    .select("id").single();
+  // Run customer insert + geocoding in parallel
+  const [{ data: customer, error: custErr }, geo] = await Promise.all([
+    ctx.supabase.from("customers")
+      .insert({ company_id: ctx.companyId, name, phone })
+      .select("id").single(),
+    geocodeWithTimeout(address, city ?? undefined),
+  ]);
   if (custErr || !customer) return { error: custErr?.message ?? "Hiba." };
 
-  // Geocode async, don't block on failure
-  let lat: number | null = null;
-  let lng: number | null = null;
-  let h3_index: string | null = null;
-  const geo = await geocodeAddress(address, city ?? undefined);
-  if (geo) { lat = geo.lat; lng = geo.lng; h3_index = toH3(geo.lat, geo.lng); }
+  const lat = geo?.lat ?? null;
+  const lng = geo?.lng ?? null;
+  const h3_index = geo ? toH3(geo.lat, geo.lng) : null;
 
   const { error: siteErr } = await ctx.supabase.from("sites").insert({
     company_id: ctx.companyId,
@@ -155,7 +162,7 @@ export async function createSite(customerId: string, formData: FormData) {
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   let lat: number | null = null, lng: number | null = null, h3_index: string | null = null;
-  const geo = await geocodeAddress(parsed.data.address, parsed.data.city, parsed.data.zip);
+  const geo = await geocodeWithTimeout(parsed.data.address, parsed.data.city, parsed.data.zip);
   if (geo) { lat = geo.lat; lng = geo.lng; h3_index = toH3(geo.lat, geo.lng); }
 
   const { error } = await ctx.supabase.from("sites").insert({
@@ -179,7 +186,7 @@ export async function updateSite(siteId: string, customerId: string, formData: F
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   let lat: number | null = null, lng: number | null = null, h3_index: string | null = null;
-  const geo = await geocodeAddress(parsed.data.address, parsed.data.city, parsed.data.zip);
+  const geo = await geocodeWithTimeout(parsed.data.address, parsed.data.city, parsed.data.zip);
   if (geo) { lat = geo.lat; lng = geo.lng; h3_index = toH3(geo.lat, geo.lng); }
 
   const { error } = await ctx.supabase.from("sites")

@@ -28,26 +28,18 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
   const { supabase, companyId, user } = ctx;
   const cu = { company_id: companyId, role: ctx.role };
 
-  // Conflict check
-  if (technicianId) {
-    const { data: conflicts } = await supabase
-      .from("appointments")
-      .select("id")
-      .eq("company_id", cu.company_id)
-      .eq("technician_id", technicianId)
-      .neq("status", "lemondva")
-      .lt("starts_at", endsAt)
-      .gt("ends_at", startsAt)
-      .limit(1);
-    if ((conflicts?.length ?? 0) > 0) return { error: "Ütközés: a szerelőnek már van foglalása ebben az időszakban." };
-  }
-
-  // Generate job number
+  // Conflict check + job number count — run in parallel
   const year = new Date().getFullYear().toString();
-  const { count } = await supabase
-    .from("jobs").select("id", { count: "exact", head: true })
-    .eq("company_id", cu.company_id)
-    .like("job_number", `${year}-%`);
+  const [conflictResult, { count }] = await Promise.all([
+    technicianId
+      ? supabase.from("appointments").select("id")
+          .eq("company_id", cu.company_id).eq("technician_id", technicianId)
+          .neq("status", "lemondva").lt("starts_at", endsAt).gt("ends_at", startsAt).limit(1)
+      : Promise.resolve({ data: [] as { id: string }[] }),
+    supabase.from("jobs").select("id", { count: "exact", head: true })
+      .eq("company_id", cu.company_id).like("job_number", `${year}-%`),
+  ]);
+  if ((conflictResult.data?.length ?? 0) > 0) return { error: "Ütközés: a szerelőnek már van foglalása ebben az időszakban." };
   const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
   const jobNumber = `${year}-${seq}`;
 
@@ -110,19 +102,23 @@ export async function searchCustomers(query: string) {
 export async function getCustomerSitesAndEquipment(customerId: string) {
   const ctx = await getAuthContext();
   if (!ctx) return { sites: [], equipment: [] };
-  const [{ data: sites }, { data: equipment }] = await Promise.all([
-    ctx.supabase
-      .from("sites")
-      .select("id, address, city, zip")
-      .eq("company_id", ctx.companyId)
-      .eq("customer_id", customerId)
-      .order("address"),
-    ctx.supabase
-      .from("equipment")
-      .select("id, manufacturer, model, kind, site_id")
-      .eq("company_id", ctx.companyId)
-      .eq("customer_id", customerId)
-      .order("manufacturer"),
-  ]);
+
+  const { data: sites } = await ctx.supabase
+    .from("sites")
+    .select("id, address, city, zip")
+    .eq("company_id", ctx.companyId)
+    .eq("customer_id", customerId)
+    .order("address");
+
+  const siteIds = (sites ?? []).map(s => s.id);
+  const { data: equipment } = siteIds.length > 0
+    ? await ctx.supabase
+        .from("equipment")
+        .select("id, manufacturer, model, kind, site_id")
+        .eq("company_id", ctx.companyId)
+        .in("site_id", siteIds)
+        .order("manufacturer")
+    : { data: [] as { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null }[] };
+
   return { sites: sites ?? [], equipment: equipment ?? [] };
 }
