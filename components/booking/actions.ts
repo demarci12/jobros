@@ -116,14 +116,12 @@ export async function getCustomerSitesAndEquipment(customerId: string) {
       .select("id, address, city, zip")
       .eq("company_id", ctx.companyId)
       .eq("customer_id", customerId)
-      .is("deleted_at", null)
       .order("address"),
     ctx.supabase
       .from("equipment")
       .select("id, manufacturer, model, kind, site_id")
       .eq("company_id", ctx.companyId)
       .eq("customer_id", customerId)
-      .is("deleted_at", null)
       .order("manufacturer"),
   ]);
   return { sites: sites ?? [], equipment: equipment ?? [] };
