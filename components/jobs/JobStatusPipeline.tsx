@@ -1,7 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { transitionJob } from "@/lib/jobs/actions";
 import { canTransition, STATUS_LABELS, type JobStatus } from "@/lib/jobs/status-machine";
 import { Button } from "@/components/ui/button";
@@ -17,20 +16,26 @@ export function JobStatusPipeline({ jobId, currentStatus, canEdit, assignedTo, c
   currentUserId: string;
   currentUserRole: string;
 }) {
-  const router = useRouter();
+  const [status, setStatus] = useState<JobStatus>(currentStatus);
   const [isPending, startTransition] = useTransition();
 
   const allowedNext = (["uj","felmeres","arajanlat","utemezve","folyamatban","kesz","szamlazva","fizetve","elutasitva","lemondva"] as JobStatus[])
-    .filter(s => canTransition(currentStatus, s));
+    .filter(s => canTransition(status, s));
 
   const isTech = currentUserRole === "technician";
   const canAct = canEdit || (isTech && assignedTo === currentUserId);
 
   function handleTransition(to: JobStatus) {
+    const prev = status;
+    setStatus(to);
     startTransition(async () => {
       const result = await transitionJob(jobId, to);
-      if (result?.error) toast.error(result.error);
-      else { toast.success(`Státusz: ${STATUS_LABELS[to]}`); router.refresh(); }
+      if (result?.error) {
+        toast.error(result.error);
+        setStatus(prev);
+      } else {
+        toast.success(`Státusz: ${STATUS_LABELS[to]}`);
+      }
     });
   }
 
@@ -39,9 +44,9 @@ export function JobStatusPipeline({ jobId, currentStatus, canEdit, assignedTo, c
       {/* Pipeline vizuális */}
       <div className="flex items-center gap-0.5 overflow-x-auto">
         {PIPELINE_STEPS.map((step, i) => {
-          const idx = PIPELINE_STEPS.indexOf(currentStatus);
+          const idx = PIPELINE_STEPS.indexOf(status);
           const isPast = i < idx;
-          const isCurrent = step === currentStatus;
+          const isCurrent = step === status;
           return (
             <div key={step} className="flex items-center">
               <div className={`px-2 py-0.5 text-xs rounded whitespace-nowrap ${

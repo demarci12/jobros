@@ -33,35 +33,38 @@ export async function clockIn(jobId: string) {
     return { error: "Már fut egy időmérő. Előbb állítsd le a jelenlegi munkát." };
   }
 
-  const { error } = await ctx.supabase.from("time_entries").insert({
+  const startedAt = new Date().toISOString();
+  const { data: entry, error } = await ctx.supabase.from("time_entries").insert({
     company_id: ctx.companyId,
     job_id: jobId,
     technician_id: ctx.userId,
-    started_at: new Date().toISOString(),
-  });
+    started_at: startedAt,
+  }).select("id, technician_id, started_at, stopped_at, duration_min, note").single();
 
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/worksheet`);
-  return { success: true };
+  return { entry };
 }
 
 export async function clockOut(entryId: string, jobId: string, note?: string) {
   const ctx = await getCtx(jobId);
   if (!ctx?.canWrite) return { error: "Nincs jogosultság." };
 
-  const { error } = await ctx.supabase
+  const stoppedAt = new Date().toISOString();
+  const { data: entry, error } = await ctx.supabase
     .from("time_entries")
     .update({
-      stopped_at: new Date().toISOString(),
+      stopped_at: stoppedAt,
       ...(note ? { note } : {}),
     })
     .eq("id", entryId)
-    .eq("technician_id", ctx.userId)  // RLS: only own entries
-    .is("stopped_at", null);          // guard: only running entries
+    .eq("technician_id", ctx.userId)
+    .is("stopped_at", null)
+    .select("id, technician_id, started_at, stopped_at, duration_min, note").single();
 
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/worksheet`);
-  return { success: true };
+  return { entry };
 }
 
 export async function deleteTimeEntry(entryId: string, jobId: string) {

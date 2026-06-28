@@ -26,11 +26,12 @@ export async function createQuote(jobId: string) {
     company_id: ctx.companyId,
     job_id: jobId,
     quote_number: quoteNumber,
-  }).select("id").single();
+  }).select("id, quote_number, status, valid_until, notes").single();
 
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/quote`);
-  return { quoteId: data.id };
+  revalidatePath(`/jobs/${jobId}`);
+  return { quote: { ...data, lines: [] } };
 }
 
 const lineSchema = z.object({
@@ -60,15 +61,19 @@ export async function addQuoteLine(quoteId: string, jobId: string, formData: For
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const { error } = await ctx.supabase.from("quote_lines").insert({
+  const lineTotal = parsed.data.quantity * parsed.data.unit_price;
+
+  const { data, error } = await ctx.supabase.from("quote_lines").insert({
     company_id: ctx.companyId,
     quote_id: quoteId,
     ...parsed.data,
     option_group: parsed.data.option_group || null,
-  });
+    line_total: lineTotal,
+  }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_optional, option_group, is_selected").single();
+
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/quote`);
-  return { success: true };
+  return { line: data };
 }
 
 export async function toggleLineSelected(lineId: string, isSelected: boolean, jobId: string) {

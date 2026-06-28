@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import {
   createQuote, addQuoteLine, toggleLineSelected, deleteQuoteLine, updateQuoteStatus,
 } from "@/lib/quotes/actions";
@@ -34,14 +33,12 @@ type Quote = {
   lines: QuoteLine[];
 };
 
-const OPTION_GROUPS = ["", "good", "better", "best"] as const;
 const OPTION_LABELS: Record<string, string> = { good: "Alap", better: "Standard", best: "Prémium" };
 const STATUS_LABELS: Record<string, string> = { draft: "Vázlat", sent: "Elküldve", accepted: "Elfogadva", rejected: "Elutasítva" };
 const STATUS_COLORS: Record<string, string> = { draft: "bg-gray-100 text-gray-700", sent: "bg-blue-100 text-blue-700", accepted: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700" };
 const VAT_OPTIONS = [0, 5, 18, 27];
 
 export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: string; initialQuote: Quote | null; canEdit?: boolean }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [quote, setQuote] = useState<Quote | null>(initialQuote);
   const [newLine, setNewLine] = useState({
@@ -53,7 +50,10 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
     startTransition(async () => {
       const result = await createQuote(jobId);
       if (result?.error) toast.error(result.error);
-      else { toast.success("Árajánlat létrehozva."); router.refresh(); }
+      else if ("quote" in result) {
+        setQuote(result.quote as Quote);
+        toast.success("Árajánlat létrehozva.");
+      }
     });
   }
 
@@ -64,37 +64,56 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
       Object.entries(newLine).forEach(([k, v]) => fd.set(k, v.toString()));
       if (newLine.is_optional) fd.set("is_optional", "1");
       const result = await addQuoteLine(quote.id, jobId, fd);
-      if (result?.error) toast.error(result.error);
-      else {
+      if (result?.error) {
+        toast.error(result.error);
+      } else if ("line" in result && result.line) {
+        setQuote(q => q ? { ...q, lines: [...q.lines, result.line as QuoteLine] } : q);
         setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_optional: false, option_group: "" });
-        router.refresh();
+        toast.success("Tétel hozzáadva.");
       }
     });
   }
 
   function handleToggle(lineId: string, current: boolean) {
+    // Optimistic update
+    setQuote(q => q ? { ...q, lines: q.lines.map(l => l.id === lineId ? { ...l, is_selected: !current } : l) } : q);
     startTransition(async () => {
       const result = await toggleLineSelected(lineId, !current, jobId);
-      if (result?.error) toast.error(result.error);
-      else router.refresh();
+      if (result?.error) {
+        toast.error(result.error);
+        // Revert
+        setQuote(q => q ? { ...q, lines: q.lines.map(l => l.id === lineId ? { ...l, is_selected: current } : l) } : q);
+      }
     });
   }
 
   function handleDelete(lineId: string) {
     if (!quote) return;
+    // Optimistic update
+    const prev = quote.lines;
+    setQuote(q => q ? { ...q, lines: q.lines.filter(l => l.id !== lineId) } : q);
     startTransition(async () => {
       const result = await deleteQuoteLine(lineId, jobId);
-      if (result?.error) toast.error(result.error);
-      else router.refresh();
+      if (result?.error) {
+        toast.error(result.error);
+        setQuote(q => q ? { ...q, lines: prev } : q);
+      }
     });
   }
 
   function handleStatusChange(status: string) {
     if (!quote) return;
+    const prevStatus = quote.status;
+    // Optimistic update
+    setQuote(q => q ? { ...q, status } : q);
     startTransition(async () => {
       const result = await updateQuoteStatus(quote.id, status, jobId);
-      if (result?.error) toast.error(result.error);
-      else { toast.success(`Állapot: ${STATUS_LABELS[status]}`); router.refresh(); }
+      if (result?.error) {
+        toast.error(result.error);
+        setQuote(q => q ? { ...q, status: prevStatus } : q);
+      } else {
+        toast.success(`Állapot: ${STATUS_LABELS[status]}`);
+      }
     });
   }
 
@@ -102,9 +121,11 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
     return (
       <div className="text-center py-10 space-y-3">
         <p className="text-sm text-muted-foreground">Még nincs árajánlat ehhez a munkához.</p>
-        <Button onClick={handleCreateQuote} disabled={isPending}>
-          <Plus size={15} className="mr-1.5" /> Árajánlat létrehozása
-        </Button>
+        {canEdit && (
+          <Button onClick={handleCreateQuote} disabled={isPending}>
+            <Plus size={15} className="mr-1.5" /> Árajánlat létrehozása
+          </Button>
+        )}
       </div>
     );
   }
@@ -114,7 +135,6 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
   const vatTotal = selectedLines.reduce((s, l) => s + l.line_total * (l.vat_rate / 100), 0);
   const total = subtotal + vatTotal;
 
-  // Group lines by option_group
   const groups = Array.from(new Set(quote.lines.map(l => l.option_group ?? ""))).sort();
 
   return (
@@ -127,23 +147,25 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
             {STATUS_LABELS[quote.status] ?? quote.status}
           </Badge>
         </div>
-        <div className="flex gap-2">
-          {quote.status === "draft" && (
-            <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleStatusChange("sent")}>
-              <Send size={13} className="mr-1" /> Elküld
-            </Button>
-          )}
-          {quote.status === "sent" && (
-            <>
-              <Button size="sm" variant="outline" className="text-green-700" disabled={isPending} onClick={() => handleStatusChange("accepted")}>
-                <CheckCircle size={13} className="mr-1" /> Elfogadva
+        {canEdit && (
+          <div className="flex gap-2">
+            {quote.status === "draft" && (
+              <Button size="sm" variant="outline" disabled={isPending} onClick={() => handleStatusChange("sent")}>
+                <Send size={13} className="mr-1" /> Elküld
               </Button>
-              <Button size="sm" variant="outline" className="text-destructive" disabled={isPending} onClick={() => handleStatusChange("rejected")}>
-                <XCircle size={13} className="mr-1" /> Elutasítva
-              </Button>
-            </>
-          )}
-        </div>
+            )}
+            {quote.status === "sent" && (
+              <>
+                <Button size="sm" variant="outline" className="text-green-700" disabled={isPending} onClick={() => handleStatusChange("accepted")}>
+                  <CheckCircle size={13} className="mr-1" /> Elfogadva
+                </Button>
+                <Button size="sm" variant="outline" className="text-destructive" disabled={isPending} onClick={() => handleStatusChange("rejected")}>
+                  <XCircle size={13} className="mr-1" /> Elutasítva
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Tételek csoportonként */}
@@ -166,14 +188,14 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
                     <th className="px-3 py-1.5 text-right">Egységár</th>
                     <th className="px-3 py-1.5 text-right">ÁFA%</th>
                     <th className="px-3 py-1.5 text-right">Nettó</th>
-                    <th className="px-2 py-1.5" />
+                    {canEdit && <th className="px-2 py-1.5" />}
                   </tr>
                 </thead>
                 <tbody>
                   {groupLines.map(l => (
                     <tr key={l.id} className={`border-b last:border-0 ${l.is_optional && !l.is_selected ? "opacity-50" : ""}`}>
                       <td className="px-2 py-2">
-                        {l.is_optional && (
+                        {l.is_optional && canEdit && (
                           <input type="checkbox" checked={l.is_selected} onChange={() => handleToggle(l.id, l.is_selected)}
                             className="h-3.5 w-3.5 accent-foreground" />
                         )}
@@ -186,12 +208,14 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
                       <td className="px-3 py-2 text-right">{l.unit_price.toLocaleString("hu-HU")} Ft</td>
                       <td className="px-3 py-2 text-right">{l.vat_rate}%</td>
                       <td className="px-3 py-2 text-right font-medium">{l.line_total.toLocaleString("hu-HU")} Ft</td>
-                      <td className="px-2 py-2">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          disabled={isPending} onClick={() => handleDelete(l.id)}>
-                          <Trash2 size={13} />
-                        </Button>
-                      </td>
+                      {canEdit && (
+                        <td className="px-2 py-2">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                            disabled={isPending} onClick={() => handleDelete(l.id)}>
+                            <Trash2 size={13} />
+                          </Button>
+                        </td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
@@ -213,7 +237,7 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
       )}
 
       {/* Új tétel */}
-      {quote.status === "draft" && (
+      {canEdit && quote.status === "draft" && (
         <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
           <p className="text-xs font-medium text-muted-foreground">Új tétel</p>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">

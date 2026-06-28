@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { upsertWorksheet, addWorksheetLine, deleteWorksheetLine } from "@/lib/worksheets/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,11 +48,11 @@ export function WorksheetClient({
   canEdit: boolean;
   catalogMaterials?: CatalogMaterial[];
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [workDone, setWorkDone] = useState(worksheet.work_done ?? "");
   const [laborHours, setLaborHours] = useState(worksheet.labor_hours?.toString() ?? "");
   const [worksheetId, setWorksheetId] = useState(worksheet.id);
+  const [lines, setLines] = useState<Line[]>(worksheet.lines);
 
   // New line form state
   const [newLine, setNewLine] = useState({
@@ -72,7 +71,6 @@ export function WorksheetClient({
       else {
         if (result.worksheetId) setWorksheetId(result.worksheetId);
         toast.success("Munkalap mentve.");
-        router.refresh();
       }
     });
   }
@@ -84,25 +82,31 @@ export function WorksheetClient({
       Object.entries(newLine).forEach(([k, v]) => { if (v !== "") fd.set(k, v.toString()); });
       if (newLine.is_labor) fd.set("is_labor", "1");
       const result = await addWorksheetLine(worksheetId, jobId, fd);
-      if (result?.error) toast.error(result.error);
-      else {
+      if (result?.error) {
+        toast.error(result.error);
+      } else if ("line" in result && result.line) {
+        setLines(ls => [...ls, result.line as Line]);
         setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_labor: false, material_id: "" });
-        router.refresh();
+        toast.success("Tétel hozzáadva.");
       }
     });
   }
 
   function handleDeleteLine(lineId: string) {
     if (!worksheetId) return;
+    const prev = lines;
+    setLines(ls => ls.filter(l => l.id !== lineId));
     startTransition(async () => {
       const result = await deleteWorksheetLine(lineId, worksheetId, jobId);
-      if (result?.error) toast.error(result.error);
-      else router.refresh();
+      if (result?.error) {
+        toast.error(result.error);
+        setLines(prev);
+      }
     });
   }
 
-  const subtotal = worksheet.lines.reduce((s, l) => s + l.line_total, 0);
-  const vatTotal = worksheet.lines.reduce((s, l) => s + l.line_total * (l.vat_rate / 100), 0);
+  const subtotal = lines.reduce((s: number, l: Line) => s + l.line_total, 0);
+  const vatTotal = lines.reduce((s: number, l: Line) => s + l.line_total * (l.vat_rate / 100), 0);
   const total = subtotal + vatTotal;
 
   return (
@@ -135,7 +139,7 @@ export function WorksheetClient({
       <div className="space-y-2">
         <h2 className="font-semibold text-sm">Tételek</h2>
 
-        {worksheet.lines.length > 0 && (
+        {lines.length > 0 && (
           <div className="rounded-lg border overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -150,7 +154,7 @@ export function WorksheetClient({
                 </tr>
               </thead>
               <tbody>
-                {worksheet.lines.map(l => (
+                {lines.map(l => (
                   <tr key={l.id} className="border-b last:border-0 hover:bg-muted/20">
                     <td className="px-3 py-2">
                       {l.description}
@@ -177,7 +181,7 @@ export function WorksheetClient({
         )}
 
         {/* Összesítő */}
-        {worksheet.lines.length > 0 && (
+        {lines.length > 0 && (
           <div className="flex justify-end">
             <div className="text-sm space-y-0.5 text-right">
               <div className="text-muted-foreground">Nettó: {subtotal.toLocaleString("hu-HU")} Ft</div>

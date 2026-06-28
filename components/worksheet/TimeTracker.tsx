@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { clockIn, clockOut, deleteTimeEntry } from "@/lib/time-entries/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,7 +34,7 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
       setElapsed(Math.floor(ms / 60000));
     };
     update();
-    const id = setInterval(update, 10000); // update every 10s
+    const id = setInterval(update, 10000);
     return () => clearInterval(id);
   }, [startedAt]);
 
@@ -44,7 +43,7 @@ function ElapsedTimer({ startedAt }: { startedAt: string }) {
 
 export function TimeTracker({
   jobId,
-  entries,
+  entries: initialEntries,
   currentUserId,
   canEdit,
 }: {
@@ -53,8 +52,8 @@ export function TimeTracker({
   currentUserId: string;
   canEdit: boolean;
 }) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [entries, setEntries] = useState<TimeEntry[]>(initialEntries);
   const [note, setNote] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<TimeEntry | null>(null);
 
@@ -66,8 +65,12 @@ export function TimeTracker({
   function handleClockIn() {
     startTransition(async () => {
       const res = await clockIn(jobId);
-      if (res?.error) toast.error(res.error);
-      else { toast.success("Időmérő elindítva."); router.refresh(); }
+      if (res?.error) {
+        toast.error(res.error);
+      } else if ("entry" in res && res.entry) {
+        setEntries(es => [...es, { ...res.entry, profiles: null } as TimeEntry]);
+        toast.success("Időmérő elindítva.");
+      }
     });
   }
 
@@ -75,17 +78,30 @@ export function TimeTracker({
     if (!running) return;
     startTransition(async () => {
       const res = await clockOut(running.id, jobId, note || undefined);
-      if (res?.error) toast.error(res.error);
-      else { toast.success("Időmérő leállítva."); setNote(""); router.refresh(); }
+      if (res?.error) {
+        toast.error(res.error);
+      } else if ("entry" in res && res.entry) {
+        setEntries(es => es.map(e => e.id === running.id ? { ...e, ...res.entry } as TimeEntry : e));
+        setNote("");
+        toast.success("Időmérő leállítva.");
+      }
     });
   }
 
   function handleDelete() {
     if (!deleteTarget) return;
+    const prev = entries;
+    const target = deleteTarget;
+    setEntries(es => es.filter(e => e.id !== target.id));
+    setDeleteTarget(null);
     startTransition(async () => {
-      const res = await deleteTimeEntry(deleteTarget.id, jobId);
-      if (res?.error) toast.error(res.error);
-      else { toast.success("Bejegyzés törölve."); setDeleteTarget(null); router.refresh(); }
+      const res = await deleteTimeEntry(target.id, jobId);
+      if (res?.error) {
+        toast.error(res.error);
+        setEntries(prev);
+      } else {
+        toast.success("Bejegyzés törölve.");
+      }
     });
   }
 
@@ -101,7 +117,6 @@ export function TimeTracker({
         )}
       </div>
 
-      {/* Running timer */}
       {running && (
         <div className="flex items-center gap-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2">
           <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
@@ -120,14 +135,12 @@ export function TimeTracker({
         </div>
       )}
 
-      {/* Clock-in button */}
       {canEdit && !running && (
         <Button size="sm" variant="outline" disabled={isPending} onClick={handleClockIn}>
           <Play size={13} className="mr-1 text-green-600" /> Időmérő indítása
         </Button>
       )}
 
-      {/* Entries list */}
       {entries.length > 0 && (
         <div className="rounded-lg border overflow-hidden">
           <table className="w-full text-sm">

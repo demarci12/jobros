@@ -78,12 +78,12 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
 
   const { material_id, ...lineData } = parsed.data;
 
-  const { error } = await ctx.supabase.from("worksheet_lines").insert({
+  const { data: insertedLine, error } = await ctx.supabase.from("worksheet_lines").insert({
     company_id: ctx.companyId,
     worksheet_id: worksheetId,
     ...(material_id ? { material_id } : {}),
     ...lineData,
-  });
+  }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_labor").single();
   if (error) return { error: error.message };
 
   // Atomic stock deduction when material is linked
@@ -110,7 +110,7 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
   }
 
   revalidatePath(`/jobs/${jobId}/worksheet`);
-  return { success: true };
+  return { line: insertedLine };
 }
 
 export async function deleteWorksheetLine(lineId: string, worksheetId: string, jobId: string) {
