@@ -18,9 +18,11 @@ export default async function CompanyPage() {
 
   const { data: company } = await supabase
     .from("companies")
-    .select("name, tax_number, address, phone, email")
+    .select("name, tax_number, address, phone, email, public_slug")
     .eq("id", cu.company_id)
     .single();
+
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://jobros.vercel.app";
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -28,7 +30,7 @@ export default async function CompanyPage() {
         <h1 className="text-xl font-semibold">Cégadatok</h1>
         <p className="text-sm text-muted-foreground mt-1">Számlázáshoz és nyilvános profilhoz.</p>
       </div>
-      <CompanyForm company={company} isOwner={cu.role === "owner"} />
+      <CompanyForm company={company} isOwner={cu.role === "owner"} siteUrl={siteUrl} />
     </div>
   );
 }

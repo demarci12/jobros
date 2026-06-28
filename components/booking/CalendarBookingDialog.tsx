@@ -101,7 +101,7 @@ export function CalendarBookingDialog({
     startTransition(async () => {
       const result = await createBooking({
         customerId: customer.id,
-        siteId,
+        siteId: siteId || null,
         serviceId: serviceId || null,
         equipmentId: equipmentId || null,
         title: selectedService?.name ?? null,
@@ -231,7 +231,7 @@ export function CalendarBookingDialog({
               <Button variant="ghost" onClick={() => setStep("customer")}>← Vissza</Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose}>Mégsem</Button>
-                <Button onClick={() => setStep("slot")} disabled={!siteId || !serviceId}>
+                <Button onClick={() => setStep("slot")}>
                   Időpont választása →
                 </Button>
               </div>

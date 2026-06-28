@@ -23,6 +23,8 @@ export async function updateCompany(formData: FormData) {
   const companyId = await getOwnerCompanyId();
   if (!companyId) return { error: "Csak az owner szerkesztheti a cégadatokat." };
 
+  const rawSlug = (formData.get("public_slug") as string || "").trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").replace(/^-|-$/g, "");
+
   const parsed = companySchema.safeParse({
     name: formData.get("name"),
     tax_number: formData.get("tax_number") || undefined,
@@ -41,6 +43,7 @@ export async function updateCompany(formData: FormData) {
       address: parsed.data.address ?? null,
       phone: parsed.data.phone ?? null,
       email: parsed.data.email || null,
+      public_slug: rawSlug || null,
     })
     .eq("id", companyId);
 
