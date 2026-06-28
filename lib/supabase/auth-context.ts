@@ -2,13 +2,14 @@ import "server-only";
 import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { createClient } from "./server";
+import { createServiceClient } from "./service";
 
 // Cache the company_users lookup per userId for 5 minutes.
-// This is safe: role changes are rare and handled via revalidateTag("company-user:<id>").
+// Uses service client (no cookie context needed) inside unstable_cache.
 const getCachedCompanyUser = (userId: string) =>
   unstable_cache(
     async () => {
-      const supabase = createClient();
+      const supabase = createServiceClient();
       const { data } = await supabase
         .from("company_users")
         .select("company_id, role")
