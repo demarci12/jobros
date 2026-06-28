@@ -1,21 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ManualSlotPicker } from "./ManualSlotPicker";
 import { createBooking } from "./actions";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+  Dialog, DialogContent, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -38,7 +31,6 @@ export function BookingDropup({
   technicians,
   equipment,
   existingAppointments,
-  bookingMode,
   defaultSlotDurationMin,
   workingHours,
 }: {
@@ -59,13 +51,24 @@ export function BookingDropup({
   const [step, setStep] = useState<"setup" | "slot">("setup");
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [equipmentId, setEquipmentId] = useState<string>("");
+  const [equipmentId, setEquipmentId] = useState("");
   const [title, setTitle] = useState("");
   const [kind, setKind] = useState<"munka" | "felmeres">("munka");
   const [isPending, startTransition] = useTransition();
 
-  const siteEquipment = equipment.filter(e => !e.site_id || e.site_id === siteId);
+  // Reset when reopened
+  useEffect(() => {
+    if (open) {
+      setStep("setup");
+      setSiteId(sites[0]?.id ?? "");
+      setServiceId(services[0]?.id ?? "");
+      setEquipmentId("");
+      setTitle("");
+      setKind("munka");
+    }
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const siteEquipment = equipment.filter(e => !e.site_id || e.site_id === siteId);
   const selectedService = services.find(s => s.id === serviceId);
   const durationMin = selectedService?.duration_min ?? defaultSlotDurationMin;
 
@@ -92,6 +95,8 @@ export function BookingDropup({
     });
   }
 
+  const canProceed = !!siteId;
+
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
@@ -101,49 +106,52 @@ export function BookingDropup({
 
         {step === "setup" ? (
           <div className="space-y-4">
+            {sites.length === 0 && (
+              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                Ehhez az ügyfélhez még nincs rögzített telephely. Kérjük, előbb add meg a helyszínt.
+              </p>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>Telephely</Label>
-                <Select value={siteId} onValueChange={v => setSiteId(v ?? "")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {sites.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.address}{s.city ? `, ${s.city}` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Telephely / cím *</Label>
+                {sites.length > 0 ? (
+                  <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
+                    <SelectTrigger><SelectValue placeholder="Válassz helyszínt…" /></SelectTrigger>
+                    <SelectContent>
+                      {sites.map(s => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.address}{s.city ? `, ${s.city}` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nincs telephely</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <Label>Szolgáltatás</Label>
-                <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {services.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.duration_min ? ` (${s.duration_min} perc)` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Típus</Label>
-                <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="munka">Munka</SelectItem>
-                    <SelectItem value="felmeres">Felmérés</SelectItem>
-                  </SelectContent>
-                </Select>
+                {services.length > 0 ? (
+                  <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
+                    <SelectTrigger><SelectValue placeholder="Válassz…" /></SelectTrigger>
+                    <SelectContent>
+                      {services.map(s => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.name}{s.duration_min ? ` (${s.duration_min} perc)` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <p className="text-xs text-muted-foreground pt-2">Nincs beállított szolgáltatás (Beállítások → Szolgáltatások)</p>
+                )}
               </div>
 
               <div className="space-y-1.5">
                 <Label>Berendezés (opcionális)</Label>
-                <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
+                <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)} disabled={!siteId}>
                   <SelectTrigger><SelectValue placeholder="— nincs —" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="__none">— nincs —</SelectItem>
@@ -157,15 +165,29 @@ export function BookingDropup({
               </div>
 
               <div className="space-y-1.5">
+                <Label>Típus</Label>
+                <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="munka">Munka / kiszállás</SelectItem>
+                    <SelectItem value="felmeres">Felmérés</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Megnevezés (opcionális)</Label>
-                <Input value={title} onChange={e => setTitle(e.target.value)}
-                  placeholder={selectedService?.name ?? "Pl. Klíma szerviz"} />
+                <Input
+                  value={title}
+                  onChange={e => setTitle(e.target.value)}
+                  placeholder={selectedService?.name ?? "Pl. Éves klíma karbantartás"}
+                />
               </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={onClose}>Mégsem</Button>
-              <Button onClick={() => setStep("slot")} disabled={!siteId}>
+              <Button onClick={() => setStep("slot")} disabled={!canProceed}>
                 Időpont választása →
               </Button>
             </div>
@@ -175,7 +197,7 @@ export function BookingDropup({
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="sm" onClick={() => setStep("setup")}>← Vissza</Button>
               <span className="text-sm text-muted-foreground">
-                {selectedService?.name} · {durationMin} perc
+                {selectedService?.name ?? title ?? "Foglalás"} · {durationMin} perc
               </span>
             </div>
 

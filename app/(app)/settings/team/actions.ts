@@ -2,24 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { randomBytes } from "crypto";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
+import { createServiceClient } from "@/lib/supabase/service";
 import { inviteSchema, roleSchema } from "@/lib/validators/settings";
 import { checkEntitlement } from "@/lib/billing/entitlements";
+import { z } from "zod";
 
 async function getOwnerOrDispatcherCtx() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id, role")
-    .eq("user_id", user.id)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-  if (!cu) return null;
-  if (!["owner", "dispatcher"].includes(cu.role)) return null;
-  return { supabase, user, companyId: cu.company_id as string, role: cu.role as string };
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return null;
+  return { supabase: ctx.supabase, user: ctx.user, companyId: ctx.companyId, role: ctx.role };
 }
 
 export async function inviteMember(formData: FormData) {
@@ -46,6 +38,87 @@ export async function inviteMember(formData: FormData) {
     expires_at: expiresAt,
     invited_by: ctx.user.id,
   });
+
+  if (error) return { error: error.message };
+  revalidatePath("/settings/team");
+  return { success: true };
+}
+
+const addTechnicianSchema = z.object({
+  full_name: z.string().min(2, "Legalább 2 karakter"),
+  email: z.string().email("Érvénytelen e-mail"),
+  phone: z.string().optional(),
+  password: z.string().min(6, "Minimum 6 karakter"),
+  trades: z.string().optional(), // JSON array string
+});
+
+export async function addTechnician(formData: FormData) {
+  const ctx = await getOwnerOrDispatcherCtx();
+  if (!ctx) return { error: "Nincs jogosultságod." };
+
+  const parsed = addTechnicianSchema.safeParse({
+    full_name: formData.get("full_name"),
+    email: formData.get("email"),
+    phone: formData.get("phone") || undefined,
+    password: formData.get("password"),
+    trades: formData.get("trades") || undefined,
+  });
+  if (!parsed.success) return { error: parsed.error.errors[0].message };
+
+  const ent = await checkEntitlement(ctx.companyId, "technicians");
+  if (!ent.allowed) return { error: "Elérted a szerelő-limitet. Válts magasabb csomagra." };
+
+  const service = createServiceClient();
+
+  // Create auth user
+  const { data: authUser, error: authErr } = await service.auth.admin.createUser({
+    email: parsed.data.email,
+    password: parsed.data.password,
+    email_confirm: true,
+    user_metadata: { full_name: parsed.data.full_name },
+  });
+  if (authErr || !authUser.user) return { error: authErr?.message ?? "Felhasználó létrehozása sikertelen." };
+
+  const userId = authUser.user.id;
+
+  // Upsert profile
+  await service.from("profiles").upsert({
+    id: userId,
+    full_name: parsed.data.full_name,
+    phone: parsed.data.phone ?? null,
+  });
+
+  // Parse trades
+  let trades: string[] = [];
+  try { trades = parsed.data.trades ? JSON.parse(parsed.data.trades) : []; } catch { trades = []; }
+
+  // Add to company
+  const { error: cuErr } = await service.from("company_users").insert({
+    company_id: ctx.companyId,
+    user_id: userId,
+    role: "technician",
+    is_active: true,
+    trades,
+  });
+
+  if (cuErr) {
+    await service.auth.admin.deleteUser(userId);
+    return { error: cuErr.message };
+  }
+
+  revalidatePath("/settings/team");
+  return { success: true };
+}
+
+export async function updateTechnicianTrades(userId: string, trades: string[]) {
+  const ctx = await getOwnerOrDispatcherCtx();
+  if (!ctx) return { error: "Nincs jogosultságod." };
+
+  const { error } = await ctx.supabase
+    .from("company_users")
+    .update({ trades })
+    .eq("company_id", ctx.companyId)
+    .eq("user_id", userId);
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
