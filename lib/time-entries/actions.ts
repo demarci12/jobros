@@ -1,23 +1,19 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 
 async function getCtx(jobId: string) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
+  const { supabase, companyId, role, user } = ctx;
   const { data: job } = await supabase
     .from("jobs").select("id")
-    .eq("id", jobId).eq("company_id", cu.company_id).maybeSingle();
+    .eq("id", jobId).eq("company_id", companyId).maybeSingle();
   if (!job) return null;
-  const canWrite = ["owner", "dispatcher", "technician"].includes(cu.role);
-  const isManager = ["owner", "dispatcher"].includes(cu.role);
-  return { supabase, companyId: cu.company_id as string, userId: user.id, canWrite, isManager };
+  const canWrite = ["owner", "dispatcher", "technician"].includes(role);
+  const isManager = ["owner", "dispatcher"].includes(role);
+  return { supabase, companyId, userId: user.id, canWrite, isManager };
 }
 
 export async function clockIn(jobId: string) {

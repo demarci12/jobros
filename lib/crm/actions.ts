@@ -2,22 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
 import { geocodeAddress } from "@/lib/geo/geocode";
 import { toH3 } from "@/lib/geo/h3";
 import { customerSchema, siteSchema, equipmentSchema } from "@/lib/validators/crm";
 
 async function getCompanyCtx(roles = ["owner", "dispatcher"] as string[]) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users")
-    .select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu || !roles.includes(cu.role)) return null;
-  return { supabase, companyId: cu.company_id as string, role: cu.role as string };
+  const ctx = await getAuthContext();
+  if (!ctx || !roles.includes(ctx.role)) return null;
+  return { supabase: ctx.supabase, companyId: ctx.companyId, role: ctx.role };
 }
 
 // --- Search ---

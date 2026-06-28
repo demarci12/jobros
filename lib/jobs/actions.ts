@@ -3,17 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { assertTransition, type JobStatus } from "./status-machine";
 
 async function getJobCtx(roles = ["owner", "dispatcher", "technician"] as string[]) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu || !roles.includes(cu.role)) return null;
-  return { supabase, companyId: cu.company_id as string, userId: user.id, role: cu.role as string };
+  const ctx = await getAuthContext();
+  if (!ctx || !roles.includes(ctx.role)) return null;
+  return { supabase: ctx.supabase, companyId: ctx.companyId, userId: ctx.user.id, role: ctx.role };
 }
 
 const createJobSchema = z.object({
@@ -50,6 +46,7 @@ export async function createJob(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath("/jobs");
+  revalidatePath("/dashboard");
   revalidatePath(`/customers/${parsed.data.customer_id}`);
   return { id: data.id };
 }
@@ -109,6 +106,7 @@ export async function transitionJob(jobId: string, toStatus: JobStatus) {
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -158,6 +156,8 @@ export async function createAppointment(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${parsed.data.job_id}`);
+  revalidatePath("/calendar");
+  revalidatePath("/dashboard");
   return { id: data.id };
 }
 

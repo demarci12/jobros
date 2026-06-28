@@ -2,25 +2,21 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 
 async function getWorksheetCtx(jobId: string) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) return null;
+  const ctx = await getAuthContext();
+  if (!ctx) return null;
+  const { supabase, companyId } = ctx;
 
   // verify job access
   const { data: job } = await supabase
     .from("jobs").select("id, assigned_to")
-    .eq("id", jobId).eq("company_id", cu.company_id).maybeSingle();
+    .eq("id", jobId).eq("company_id", companyId).maybeSingle();
   if (!job) return null;
 
-  const canWrite = ["owner", "dispatcher"].includes(cu.role) || job.assigned_to === user.id;
-  return { supabase, companyId: cu.company_id as string, userId: user.id, canWrite };
+  const canWrite = ["owner", "dispatcher"].includes(ctx.role) || job.assigned_to === ctx.user.id;
+  return { supabase, companyId, userId: ctx.user.id, canWrite };
 }
 
 export async function upsertWorksheet(jobId: string, formData: FormData) {

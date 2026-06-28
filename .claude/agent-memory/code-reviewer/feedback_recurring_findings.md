@@ -239,6 +239,32 @@ Ha `jobs.assigned_to` → `auth.users(id)` (nem `company_users(id)`), a PostgRES
 
 ---
 
+## Auth waterfall duplázva: layout + minden page önállóan re-autentikál
+
+`app/(app)/layout.tsx` már elvégzi a `getUser()` + `company_users` lekérdezést. Minden nested page (dashboard, jobs, customers, calendar, job-detail layout, job-detail page) önállóan megismétli ezeket soros waterfallban — minimum 2 felesleges DB round trip/navigáció. Helyes minta: Next.js 14 `cache()` per-request helper (`lib/auth.ts:getCurrentCompanyUser()`).
+
+**Why:** Első megtalálva performance audit-ban 2026-06-28.
+
+**How to apply:** Flag as HIGH ha bármely page.tsx a `(app)/` csoportban önállóan hívja a `getUser()` + `company_users` párost ahelyett, hogy shared cached helpert használna.
+
+---
+
+## `transitionJob` / `softDeleteJob` / `createAppointment` hiányos revalidatePath-ek
+
+Rendszerszintű minta: a job-mutáló Server Actionök (lib/jobs/actions.ts) nem revalidálják az összes érintett felületet:
+- `transitionJob` — hiányzik `/dashboard`
+- `softDeleteJob` — hiányzik `/dashboard` és `/customers/[id]`  
+- `createAppointment` — hiányzik `/calendar` és `/customers/[id]`
+- `updateJob` — hiányzik `/jobs` lista
+- `convertRequestToJob` — hiányzik `/jobs`, `/customers`, `/dashboard`
+- `createQuickCustomer` — hiányzik `/customers`
+
+**Why:** Első megtalálva performance/stale audit-ban 2026-06-28.
+
+**How to apply:** Minden job/appointment/customer mutáló SA-nál ellenőrizd, hogy a dashboard, a lista oldal, ÉS az érintett customer detail oldal mind revalidálva van-e.
+
+---
+
 ## ConfirmDelete dialog can be dismissed via ESC/backdrop while loading
 
 `components/common/ConfirmDelete.tsx` passes `onOpenChange` directly to `<Dialog>` without guarding against close events while `loading=true`. This means the dialog can be ESC-closed mid-operation, leaving the delete in flight with no UI feedback.

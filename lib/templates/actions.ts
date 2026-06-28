@@ -2,7 +2,7 @@
 
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 
 // ── Sablon CRUD ──────────────────────────────────────────────────────────────
 
@@ -17,14 +17,9 @@ const TemplateSchema = z.object({
 });
 
 async function getDispatcher() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu || !["owner", "dispatcher"].includes(cu.role)) return null;
-  return { supabase, user, cu };
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return null;
+  return { supabase: ctx.supabase, user: ctx.user, cu: { company_id: ctx.companyId, role: ctx.role } };
 }
 
 export async function createTemplate(raw: unknown) {
@@ -127,40 +122,28 @@ export async function applyTemplateToJob(jobId: string, templateId: string) {
 }
 
 export async function toggleChecklistItem(itemId: string, isDone: boolean) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Nincs jogosultság." };
+  const ctx = await getAuthContext();
+  if (!ctx) return { error: "Nincs jogosultság." };
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) return { error: "Nincs jogosultság." };
-
-  const { error } = await supabase
+  const { error } = await ctx.supabase
     .from("job_checklist_state")
     .update({
       is_done: isDone,
       done_at: isDone ? new Date().toISOString() : null,
-      done_by: isDone ? user.id : null,
+      done_by: isDone ? ctx.user.id : null,
     })
-    .eq("id", itemId).eq("company_id", cu.company_id);
+    .eq("id", itemId).eq("company_id", ctx.companyId);
 
   if (error) return { error: error.message };
   return { ok: true };
 }
 
 export async function addChecklistItem(jobId: string, label: string) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Nincs jogosultság." };
+  const ctx = await getAuthContext();
+  if (!ctx) return { error: "Nincs jogosultság." };
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) return { error: "Nincs jogosultság." };
-
-  const { data, error } = await supabase.from("job_checklist_state").insert({
-    company_id: cu.company_id,
+  const { data, error } = await ctx.supabase.from("job_checklist_state").insert({
+    company_id: ctx.companyId,
     job_id: jobId,
     label,
     is_done: false,
@@ -171,17 +154,11 @@ export async function addChecklistItem(jobId: string, label: string) {
 }
 
 export async function deleteChecklistItem(itemId: string) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Nincs jogosultság." };
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
 
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu || !["owner", "dispatcher"].includes(cu.role)) return { error: "Nincs jogosultság." };
-
-  const { error } = await supabase.from("job_checklist_state")
-    .delete().eq("id", itemId).eq("company_id", cu.company_id);
+  const { error } = await ctx.supabase.from("job_checklist_state")
+    .delete().eq("id", itemId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   return { ok: true };
 }
