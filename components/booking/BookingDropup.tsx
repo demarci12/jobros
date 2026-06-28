@@ -105,77 +105,83 @@ export function BookingDropup({
         </DialogHeader>
 
         {step === "setup" ? (
-          <div className="space-y-4">
-            {sites.length === 0 && (
-              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                Ehhez az ügyfélhez még nincs rögzített telephely. Kérjük, előbb add meg a helyszínt.
-              </p>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Telephely / cím *</Label>
-                {sites.length > 0 ? (
-                  <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
-                    <SelectTrigger><SelectValue placeholder="Válassz helyszínt…" /></SelectTrigger>
-                    <SelectContent>
-                      {sites.map(s => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.address}{s.city ? `, ${s.city}` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Nincs telephely</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Szolgáltatás</Label>
-                {services.length > 0 ? (
-                  <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
-                    <SelectTrigger><SelectValue placeholder="Válassz…" /></SelectTrigger>
-                    <SelectContent>
-                      {services.map(s => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name}{s.duration_min ? ` (${s.duration_min} perc)` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <p className="text-xs text-muted-foreground pt-2">Nincs beállított szolgáltatás (Beállítások → Szolgáltatások)</p>
-                )}
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Berendezés (opcionális)</Label>
-                <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)} disabled={!siteId}>
-                  <SelectTrigger><SelectValue placeholder="— nincs —" /></SelectTrigger>
+          <div className="space-y-5">
+            {/* Telephely — kötelező */}
+            <div className="rounded-md border p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Telephely *</p>
+              {sites.length === 0 ? (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  Ehhez az ügyfélhez nincs rögzített cím. Az ügyfél profiljánál add hozzá először.
+                </p>
+              ) : (
+                <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
+                  <SelectTrigger><SelectValue placeholder="Válassz helyszínt…" /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="__none">— nincs —</SelectItem>
-                    {siteEquipment.map(e => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
+                    {sites.map(s => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.address}{s.city ? `, ${s.city}` : ""}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+              )}
+            </div>
+
+            {/* Munka részletei */}
+            <div className="rounded-md border p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Munka részletei</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Szolgáltatás</Label>
+                  {services.length === 0 ? (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Nincs szolgáltatás.{" "}
+                      <a href="/settings/services" className="underline">Beállítások → Szolgáltatások</a>
+                    </p>
+                  ) : (
+                    <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
+                      <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást…" /></SelectTrigger>
+                      <SelectContent>
+                        {services.map(s => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}{s.duration_min ? ` — ${s.duration_min} perc` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Típus</Label>
+                  <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="munka">Munka / kiszállás</SelectItem>
+                      <SelectItem value="felmeres">Felmérés</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+
+              {siteId && siteEquipment.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Berendezés (opcionális)</Label>
+                  <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="— nincs kiválasztva —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">— nincs —</SelectItem>
+                      {siteEquipment.map(e => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               <div className="space-y-1.5">
-                <Label>Típus</Label>
-                <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="munka">Munka / kiszállás</SelectItem>
-                    <SelectItem value="felmeres">Felmérés</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5 sm:col-span-2">
                 <Label>Megnevezés (opcionális)</Label>
                 <Input
                   value={title}
@@ -185,7 +191,7 @@ export function BookingDropup({
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={onClose}>Mégsem</Button>
               <Button onClick={() => setStep("slot")} disabled={!canProceed}>
                 Időpont választása →

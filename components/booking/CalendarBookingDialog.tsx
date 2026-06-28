@@ -170,18 +170,19 @@ export function CalendarBookingDialog({
         )}
 
         {step === "setup" && customer && (
-          <div className="space-y-4">
-            {sites.length === 0 && (
-              <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
-                Ehhez az ügyfélhez még nincs rögzített cím/telephely.
-                Az ügyfél profiljánál add hozzá, majd gyere vissza a foglaláshoz.
-              </p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <Label>Telephely / cím {sites.length === 0 ? "(nincs)" : "*"}</Label>
-                <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }} disabled={sites.length === 0}>
-                  <SelectTrigger><SelectValue placeholder={sites.length === 0 ? "— nincs cím —" : "Válassz…"} /></SelectTrigger>
+          <div className="space-y-5">
+            {/* Telephely — kötelező */}
+            <div className="rounded-md border p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Telephely *</p>
+              {sites.length === 0 ? (
+                <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                  Ehhez az ügyfélhez nincs rögzített cím. Az ügyfél profiljánál add hozzá, majd jöjj vissza.
+                </p>
+              ) : (
+                <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Válassz helyszínt…" />
+                  </SelectTrigger>
                   <SelectContent>
                     {sites.map(s => (
                       <SelectItem key={s.id} value={s.id}>
@@ -190,50 +191,65 @@ export function CalendarBookingDialog({
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Szolgáltatás</Label>
-                <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {services.map(s => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.name}{s.duration_min ? ` (${s.duration_min} perc)` : ""}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Berendezés (opcionális)</Label>
-                <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
-                  <SelectTrigger><SelectValue placeholder="— nincs —" /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none">— nincs —</SelectItem>
-                    {siteEquipment.map(e => (
-                      <SelectItem key={e.id} value={e.id}>
-                        {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Típus</Label>
-                <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="munka">Munka</SelectItem>
-                    <SelectItem value="felmeres">Felmérés</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              )}
             </div>
 
-            <div className="flex justify-between gap-2 pt-2">
+            {/* Szolgáltatás + Típus */}
+            <div className="rounded-md border p-4 space-y-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Munka részletei</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Szolgáltatás</Label>
+                  {services.length === 0 ? (
+                    <p className="text-xs text-muted-foreground pt-1">
+                      Nincs beállított szolgáltatás.{" "}
+                      <a href="/settings/services" className="underline">Beállítások → Szolgáltatások</a>
+                    </p>
+                  ) : (
+                    <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
+                      <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást…" /></SelectTrigger>
+                      <SelectContent>
+                        {services.map(s => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name}{s.duration_min ? ` — ${s.duration_min} perc` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label>Típus</Label>
+                  <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="munka">Munka / kiszállás</SelectItem>
+                      <SelectItem value="felmeres">Felmérés</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {siteId && siteEquipment.length > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Berendezés (opcionális)</Label>
+                  <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
+                    <SelectTrigger><SelectValue placeholder="— nincs kiválasztva —" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">— nincs —</SelectItem>
+                      {siteEquipment.map(e => (
+                        <SelectItem key={e.id} value={e.id}>
+                          {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between gap-2">
               <Button variant="ghost" onClick={() => setStep("customer")}>← Vissza</Button>
               <div className="flex gap-2">
                 <Button variant="outline" onClick={onClose}>Mégsem</Button>
