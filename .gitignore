@@ -7,3 +7,4 @@ supabase/.temp/
 .DS_Store
 .claude/settings.local.json
 tsconfig.tsbuildinfo
+.claude/worktrees/
