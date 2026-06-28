@@ -1,9 +1,11 @@
-# Jobro — Rendszerterv (tiszta, v2.0)
+# Jobro — Rendszerterv (v2.1, 2026-06-28)
 
-**Dátum:** 2026-06-25 · **Termék:** CRM + FSM + foglalás magyar HVAC/klíma/gáz vállalkozásoknak
 **Stack:** Next.js 14 (App Router) · Supabase (Postgres + Auth + Realtime + Storage, EU) · TypeScript · shadcn/ui · Tailwind · zod
 
-> Ez az **egyetlen forrás** (single source of truth). Egységes dokumentum, nincsenek egymást felülíró függelékek. A korábbi MMK / F-gáz / gázbiztonsági jegyzőkönyv koncepció **teljesen kikerült**.
+> Ez az **egyetlen forrás** (single source of truth). A build-plan.md tartalmazza a ticketeket és az implementációs állapotot.
+
+## MVP implementációs állapot (2026-06-28): ~85% kész
+Hiányzik: T-35 PDF UI gombok · T-41 hó/térkép · T-52 Google Cal · T-64 cron · T-65 audit+e2e
 
 ## Tartalom
 1. [Termékvízió](#1-termékvízió)
