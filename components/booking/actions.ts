@@ -30,23 +30,28 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
 
   // Conflict check + job number count — run in parallel
   const year = new Date().getFullYear().toString();
-  const [conflictResult, { count }] = await Promise.all([
+  const [conflictResult] = await Promise.all([
     technicianId
       ? supabase.from("appointments").select("id")
           .eq("company_id", cu.company_id).eq("technician_id", technicianId)
           .neq("status", "lemondva").lt("starts_at", endsAt).gt("ends_at", startsAt).limit(1)
       : Promise.resolve({ data: [] as { id: string }[] }),
-    supabase.from("jobs").select("id", { count: "exact", head: true })
-      .eq("company_id", cu.company_id).like("job_number", `${year}-%`),
   ]);
   if ((conflictResult.data?.length ?? 0) > 0) return { error: "Ütközés: a szerelőnek már van foglalása ebben az időszakban." };
-  const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
-  const jobNumber = `${year}-${seq}`;
 
-  // Create job
-  const { data: job, error: jobError } = await supabase
-    .from("jobs")
-    .insert({
+  async function generateJobNumber(): Promise<string> {
+    const { count } = await supabase.from("jobs").select("id", { count: "exact", head: true })
+      .eq("company_id", cu.company_id).like("job_number", `${year}-%`);
+    return `${year}-${((count ?? 0) + 1).toString().padStart(4, "0")}`;
+  }
+
+  // Create job with retry on unique conflict (race condition guard)
+  let jobNumber = await generateJobNumber();
+  let job: { id: string } | null = null;
+  let jobError: any = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await supabase.from("jobs").insert({
       company_id: cu.company_id,
       job_number: jobNumber,
       customer_id: customerId,
@@ -57,10 +62,17 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       assigned_to: technicianId,
       created_by: user.id,
       status: kind === "felmeres" ? "felmeres" : "utemezve",
-    })
-    .select("id").single();
+    }).select("id").single();
+    if (!result.error) { job = result.data; break; }
+    if (result.error.code === "23505") {
+      jobNumber = await generateJobNumber();
+      jobError = result.error;
+      continue;
+    }
+    jobError = result.error; break;
+  }
 
-  if (jobError) return { error: jobError.message };
+  if (!job) return { error: jobError?.code === "23505" ? "Foglalási szám ütközés, próbáld újra." : jobError?.message ?? "Hiba." };
 
   // Create appointment
   const { error: apptError } = await supabase
@@ -80,7 +92,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
   revalidatePath("/dashboard");
   revalidatePath("/jobs");
   revalidatePath(`/customers/${customerId}`);
-  return { jobId: job.id };
+  return { jobId: job!.id };
 }
 
 // Keresés az ügyfél-választóhoz (naptárból indított foglaláskor)

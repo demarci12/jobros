@@ -15,23 +15,38 @@ export async function createQuote(jobId: string) {
   if (!ctx) return { error: "Nincs jogosultság." };
 
   const year = new Date().getFullYear().toString();
-  const { count } = await ctx.supabase
-    .from("quotes").select("id", { count: "exact", head: true })
-    .eq("company_id", ctx.companyId)
-    .like("quote_number", `${year}-AJ%`);
-  const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
-  const quoteNumber = `${year}-AJ${seq}`;
 
-  const { data, error } = await ctx.supabase.from("quotes").insert({
-    company_id: ctx.companyId,
-    job_id: jobId,
-    quote_number: quoteNumber,
-  }).select("id, quote_number, status, valid_until, notes").single();
+  async function generateQuoteNumber(): Promise<string> {
+    const { count } = await ctx!.supabase
+      .from("quotes").select("id", { count: "exact", head: true })
+      .eq("company_id", ctx!.companyId)
+      .like("quote_number", `${year}-AJ%`);
+    return `${year}-AJ${((count ?? 0) + 1).toString().padStart(4, "0")}`;
+  }
 
-  if (error) return { error: error.message };
+  let quoteNumber = await generateQuoteNumber();
+  let quoteData: { id: string; quote_number: string; status: string; valid_until: string | null; notes: string | null } | null = null;
+  let quoteError: any = null;
+
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const result = await ctx.supabase.from("quotes").insert({
+      company_id: ctx.companyId,
+      job_id: jobId,
+      quote_number: quoteNumber,
+    }).select("id, quote_number, status, valid_until, notes").single();
+    if (!result.error) { quoteData = result.data; break; }
+    if (result.error.code === "23505") {
+      quoteNumber = await generateQuoteNumber();
+      quoteError = result.error;
+      continue;
+    }
+    quoteError = result.error; break;
+  }
+
+  if (!quoteData) return { error: quoteError?.code === "23505" ? "Árajánlat szám ütközés, próbáld újra." : quoteError?.message ?? "Hiba." };
   revalidatePath(`/jobs/${jobId}/quote`);
   revalidatePath(`/jobs/${jobId}`);
-  return { quote: { ...data, lines: [] } };
+  return { quote: { ...quoteData, lines: [] } };
 }
 
 const lineSchema = z.object({
@@ -96,8 +111,10 @@ export async function deleteQuoteLine(lineId: string, jobId: string) {
 export async function updateQuoteStatus(quoteId: string, status: string, jobId: string) {
   const ctx = await getDispatchCtx();
   if (!ctx) return { error: "Nincs jogosultság." };
+  const validStatus = z.enum(["draft", "sent", "accepted", "rejected"]).safeParse(status);
+  if (!validStatus.success) return { error: "Érvénytelen státusz." };
   const { error } = await ctx.supabase.from("quotes")
-    .update({ status }).eq("id", quoteId).eq("company_id", ctx.companyId);
+    .update({ status: validStatus.data }).eq("id", quoteId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/quote`);
   revalidatePath(`/jobs/${jobId}`);

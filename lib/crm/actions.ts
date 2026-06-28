@@ -185,16 +185,15 @@ export async function updateSite(siteId: string, customerId: string, formData: F
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  let lat: number | null = null, lng: number | null = null, h3_index: string | null = null;
   const geo = await geocodeWithTimeout(parsed.data.address, parsed.data.city, parsed.data.zip);
-  if (geo) { lat = geo.lat; lng = geo.lng; h3_index = toH3(geo.lat, geo.lng); }
+  const geoFields = geo ? { lat: geo.lat, lng: geo.lng, h3_index: toH3(geo.lat, geo.lng) } : {};
 
   const { error } = await ctx.supabase.from("sites")
-    .update({ ...parsed.data, lat, lng, h3_index })
+    .update({ ...parsed.data, ...geoFields })
     .eq("id", siteId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   revalidatePath(`/customers/${customerId}`);
-  return { success: true };
+  return { success: true, ...(geo ? {} : { geoFailed: true }) };
 }
 
 export async function deleteSite(siteId: string, customerId: string) {
