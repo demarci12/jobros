@@ -77,7 +77,7 @@ export default async function CustomerPage({ params }: { params: { id: string } 
           <BookingButton
             customerId={params.id}
             customerName={customer.name}
-            sites={(sites ?? []).map(s => ({ id: s.id, address: s.address, city: s.city ?? null }))}
+            sites={(sites ?? []).map(s => ({ id: s.id, address: s.address, city: s.city ?? null, zip: s.zip ?? null }))}
             services={(services ?? []).map(s => ({ id: s.id, name: s.name, duration_min: (s as any).duration_min ?? null }))}
             technicians={techList}
             equipment={(equipment ?? []).map((e: any) => ({ id: e.id, manufacturer: e.manufacturer, model: e.model ?? null, kind: e.kind, site_id: e.site_id ?? null }))}

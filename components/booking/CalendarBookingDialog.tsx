@@ -17,7 +17,7 @@ type Technician = { id: string; name: string };
 type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };
 
 type Customer = { id: string; name: string; phone: string | null };
-type Site = { id: string; address: string; city: string | null };
+type Site = { id: string; address: string; city: string | null; zip: string | null };
 type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
 
 type Step = "customer" | "setup" | "slot";
@@ -186,7 +186,7 @@ export function CalendarBookingDialog({
                   <SelectContent>
                     {sites.map(s => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.address}{s.city ? `, ${s.city}` : ""}
+                        {[s.zip, s.address, s.city].filter(Boolean).join(", ")}
                       </SelectItem>
                     ))}
                   </SelectContent>

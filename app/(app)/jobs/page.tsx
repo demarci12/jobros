@@ -22,7 +22,7 @@ export default async function JobsPage({ searchParams }: { searchParams: { statu
 
   let query = supabase
     .from("jobs")
-    .select("id, job_number, title, status, created_at, customers(name), services(name)")
+    .select("id, job_number, title, status, created_at, customers(name), services(name), sites(address, city, zip)")
     .eq("company_id", cu.company_id)
     .is("deleted_at", null)
     .order("created_at", { ascending: false })
@@ -59,10 +59,17 @@ export default async function JobsPage({ searchParams }: { searchParams: { statu
                 className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-muted/50 transition-colors">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground font-mono">{j.job_number}</span>
-                    <span className="font-medium text-sm truncate">{j.title || j.services?.name || "—"}</span>
+                    <span className="text-xs text-muted-foreground font-mono shrink-0">{j.job_number}</span>
+                    <span className="font-medium text-sm truncate">{j.title || (j as any).services?.name || "—"}</span>
                   </div>
-                  <p className="text-xs text-muted-foreground">{j.customers?.name}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {j.customers?.name}
+                    {(() => {
+                      const s = (j as any).sites;
+                      const addr = s ? [s.zip, s.address, s.city].filter(Boolean).join(" ") : null;
+                      return addr ? ` · ${addr}` : "";
+                    })()}
+                  </p>
                 </div>
                 <Badge className={`text-xs shrink-0 ${STATUS_COLORS[j.status as JobStatus]}`} variant="outline">
                   {STATUS_LABELS[j.status as JobStatus] ?? j.status}

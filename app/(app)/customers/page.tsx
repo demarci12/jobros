@@ -21,7 +21,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
 
   let query = supabase
     .from("customers")
-    .select("id, name, phone, email")
+    .select("id, name, phone, email, sites(address, city, zip)")
     .eq("company_id", cu.company_id)
     .is("deleted_at", null)
     .order("name")
@@ -46,19 +46,28 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
         <EmptyState icon={Users} title="Még nincs ügyfél" description="Telefon-intake-kel adj hozzá az első ügyfelet." />
       ) : (
         <ul className="divide-y rounded-lg border">
-          {(customers ?? []).map(c => (
-            <li key={c.id}>
-              <Link href={`/customers/${c.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
-                <span className="font-medium">{c.name}</span>
-                {c.phone && (
-                  <span className="text-sm text-muted-foreground flex items-center gap-1">
-                    <Phone size={13} />{c.phone}
-                  </span>
-                )}
-              </Link>
-            </li>
-          ))}
+          {(customers ?? []).map((c: any) => {
+            const firstSite = Array.isArray(c.sites) ? c.sites[0] : c.sites;
+            const addr = firstSite
+              ? [firstSite.zip, firstSite.address, firstSite.city].filter(Boolean).join(" ").trim()
+              : null;
+            return (
+              <li key={c.id}>
+                <Link href={`/customers/${c.id}`}
+                  className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors">
+                  <div className="min-w-0">
+                    <p className="font-medium">{c.name}</p>
+                    {addr && <p className="text-xs text-muted-foreground truncate">{addr}</p>}
+                  </div>
+                  {c.phone && (
+                    <span className="text-sm text-muted-foreground flex items-center gap-1 shrink-0 ml-3">
+                      <Phone size={13} />{c.phone}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>

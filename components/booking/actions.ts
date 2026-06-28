@@ -19,7 +19,9 @@ const CreateBookingSchema = z.object({
 export async function createBooking(input: z.infer<typeof CreateBookingSchema>) {
   const parsed = CreateBookingSchema.safeParse(input);
   if (!parsed.success) return { error: "Érvénytelen adatok: " + parsed.error.issues[0]?.message };
-  const { customerId, siteId, serviceId, equipmentId, title, kind, technicianId, startsAt, endsAt } = parsed.data;
+  const { customerId, siteId, serviceId, equipmentId, kind, technicianId, startsAt, endsAt } = parsed.data;
+  // Generate a fallback title so jobs are always identifiable
+  const title = parsed.data.title || null;
 
   const ctx = await getAuthContext();
   if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
@@ -109,7 +111,7 @@ export async function getCustomerSitesAndEquipment(customerId: string) {
   const [{ data: sites }, { data: equipment }] = await Promise.all([
     ctx.supabase
       .from("sites")
-      .select("id, address, city")
+      .select("id, address, city, zip")
       .eq("company_id", ctx.companyId)
       .eq("customer_id", customerId)
       .is("deleted_at", null)

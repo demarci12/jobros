@@ -15,7 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-type Site = { id: string; address: string; city: string | null };
+type Site = { id: string; address: string; city: string | null; zip?: string | null };
 type Service = { id: string; name: string; duration_min: number | null };
 type Technician = { id: string; name: string };
 type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };
@@ -119,7 +119,7 @@ export function BookingDropup({
                   <SelectContent>
                     {sites.map(s => (
                       <SelectItem key={s.id} value={s.id}>
-                        {s.address}{s.city ? `, ${s.city}` : ""}
+                        {[s.zip, s.address, s.city].filter(Boolean).join(", ")}
                       </SelectItem>
                     ))}
                   </SelectContent>
