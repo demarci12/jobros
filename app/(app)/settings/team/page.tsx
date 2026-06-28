@@ -14,7 +14,7 @@ export default async function TeamPage() {
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const { data: members } = await supabase
     .from("company_users")

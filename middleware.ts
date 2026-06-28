@@ -41,17 +41,11 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  if (!isPublic(pathname) && !pathname.startsWith("/onboarding")) {
-    if (!user) {
-      const url = request.nextUrl.clone();
-      url.pathname = "/login";
-      url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
-    }
-  }
-
-  if (pathname.startsWith("/onboarding") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (!isPublic(pathname) && !user) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/login";
+    url.searchParams.set("next", pathname);
+    return NextResponse.redirect(url);
   }
 
   if ((pathname === "/login" || pathname === "/register") && user) {

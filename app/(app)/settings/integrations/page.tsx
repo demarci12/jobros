@@ -20,7 +20,7 @@ export default async function IntegrationsPage() {
   const { data: cu } = await supabase
     .from("company_users").select("company_id, role")
     .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const [{ data: appDefs }, { data: installed }] = await Promise.all([
     supabase.from("app_definitions").select("slug, name, category, description, auth_type, sort_order").eq("is_active", true).order("sort_order"),

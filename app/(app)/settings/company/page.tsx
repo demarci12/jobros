@@ -14,7 +14,7 @@ export default async function CompanyPage() {
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const { data: company } = await supabase
     .from("companies")

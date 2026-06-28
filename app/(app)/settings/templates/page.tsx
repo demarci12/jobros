@@ -10,7 +10,7 @@ export default async function TemplatesPage() {
   const { data: cu } = await supabase
     .from("company_users").select("company_id, role")
     .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const canEdit = ["owner", "dispatcher"].includes(cu.role);
 

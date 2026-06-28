@@ -22,7 +22,7 @@ export default async function NotificationsPage() {
   const { data: cu } = await supabase
     .from("company_users").select("company_id, role")
     .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const { data: dbSettings } = await supabase
     .from("notification_settings")

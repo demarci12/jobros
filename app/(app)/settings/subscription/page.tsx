@@ -21,7 +21,7 @@ export default async function SubscriptionPage({
     .eq("is_active", true)
     .limit(1)
     .maybeSingle();
-  if (!cu) redirect("/onboarding");
+  if (!cu) redirect("/dashboard");
 
   const service = createServiceClient();
 
