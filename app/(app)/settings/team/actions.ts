@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { randomBytes } from "crypto";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
@@ -107,6 +107,7 @@ export async function addTechnician(formData: FormData) {
   }
 
   revalidatePath("/settings/team");
+  // No revalidateTag needed for new user — they have no cached entry yet.
   return {
     success: true,
     member: {
@@ -131,6 +132,7 @@ export async function updateTechnicianTrades(userId: string, trades: string[]) {
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
+  revalidateTag(`company-user-${userId}`);
   return { success: true };
 }
 
@@ -154,6 +156,7 @@ export async function changeRole(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
+  revalidateTag(`company-user-${parsed.data.userId}`);
   return { success: true };
 }
 
@@ -174,6 +177,7 @@ export async function deactivateMember(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
+  revalidateTag(`company-user-${userId}`);
   return { success: true };
 }
 
@@ -196,5 +200,6 @@ export async function reactivateMember(formData: FormData) {
 
   if (error) return { error: error.message };
   revalidatePath("/settings/team");
+  revalidateTag(`company-user-${userId}`);
   return { success: true };
 }

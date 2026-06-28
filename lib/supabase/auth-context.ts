@@ -23,14 +23,13 @@ const getCachedCompanyUser = (userId: string) =>
   )();
 
 /**
- * Per-request cached auth context. Uses getSession() (cookie read, no network)
- * since middleware already validated the JWT via getUser() on every request.
+ * Per-request cached auth context. Uses getUser() for JWT validation against
+ * the Supabase Auth server (required — getSession() is not safe in RSC).
  * The company_users row is cached 5 min via unstable_cache.
  */
 export const getAuthContext = cache(async () => {
   const supabase = createClient();
-  const { data: { session } } = await supabase.auth.getSession();
-  const user = session?.user;
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
   const cu = await getCachedCompanyUser(user.id);
