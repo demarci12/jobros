@@ -74,6 +74,7 @@ export async function createQuickCustomer(formData: FormData) {
     return { error: `Helyszín mentése sikertelen: ${siteErr.message}` };
   }
 
+  revalidatePath("/customers");
   return { id: customer.id };
 }
 

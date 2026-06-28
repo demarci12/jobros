@@ -98,5 +98,7 @@ export async function updateQuoteStatus(quoteId: string, status: string, jobId: 
     .update({ status }).eq("id", quoteId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/quote`);
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/jobs");
   return { success: true };
 }

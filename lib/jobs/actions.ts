@@ -78,6 +78,8 @@ export async function updateJob(jobId: string, formData: FormData) {
     .update(parsed.data).eq("id", jobId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/jobs");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -119,6 +121,7 @@ export async function softDeleteJob(jobId: string) {
     .eq("id", jobId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
   revalidatePath("/jobs");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
