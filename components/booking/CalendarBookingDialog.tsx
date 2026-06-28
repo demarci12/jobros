@@ -93,8 +93,14 @@ export function CalendarBookingDialog({
   }
 
   const selectedService = services.find(s => s.id === serviceId);
+  const serviceLabel = selectedService ? `${selectedService.name}${selectedService.duration_min ? ` — ${selectedService.duration_min} perc` : ""}` : undefined;
   const durationMin = selectedService?.duration_min ?? defaultSlotDurationMin;
   const siteEquipment = equipment.filter(e => !e.site_id || e.site_id === siteId);
+  const selectedSite = sites.find(s => s.id === siteId);
+  const siteLabel = selectedSite ? [selectedSite.zip, selectedSite.address, selectedSite.city].filter(Boolean).join(", ") : undefined;
+  const kindLabel = kind === "munka" ? "Munka / kiszállás" : "Felmérés";
+  const selectedEquipment = siteEquipment.find(e => e.id === equipmentId);
+  const equipmentLabel = selectedEquipment ? `${selectedEquipment.manufacturer}${selectedEquipment.model ? ` ${selectedEquipment.model}` : ""} (${selectedEquipment.kind})` : undefined;
 
   function handleSlotSelect(slot: { start: Date; end: Date }, technicianId: string | null) {
     if (!customer) return;
@@ -181,7 +187,7 @@ export function CalendarBookingDialog({
               ) : (
                 <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Válassz helyszínt…" />
+                    <SelectValue placeholder="Válassz helyszínt…">{siteLabel}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {sites.map(s => (
@@ -207,7 +213,7 @@ export function CalendarBookingDialog({
                     </p>
                   ) : (
                     <Select value={serviceId} onValueChange={v => v && setServiceId(v)}>
-                      <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást…" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást…">{serviceLabel}</SelectValue></SelectTrigger>
                       <SelectContent>
                         {services.map(s => (
                           <SelectItem key={s.id} value={s.id}>
@@ -222,7 +228,7 @@ export function CalendarBookingDialog({
                 <div className="space-y-1.5">
                   <Label>Típus</Label>
                   <Select value={kind} onValueChange={v => setKind(v as "munka" | "felmeres")}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectTrigger><SelectValue>{kindLabel}</SelectValue></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="munka">Munka / kiszállás</SelectItem>
                       <SelectItem value="felmeres">Felmérés</SelectItem>
@@ -235,7 +241,7 @@ export function CalendarBookingDialog({
                 <div className="space-y-1.5">
                   <Label>Berendezés (opcionális)</Label>
                   <Select value={equipmentId} onValueChange={v => setEquipmentId(!v || v === "__none" ? "" : v)}>
-                    <SelectTrigger><SelectValue placeholder="— nincs kiválasztva —" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder="— nincs kiválasztva —">{equipmentLabel}</SelectValue></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="__none">— nincs —</SelectItem>
                       {siteEquipment.map(e => (
