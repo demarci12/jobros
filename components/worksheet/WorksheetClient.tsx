@@ -82,12 +82,13 @@ export function WorksheetClient({
       Object.entries(newLine).forEach(([k, v]) => { if (v !== "") fd.set(k, v.toString()); });
       if (newLine.is_labor) fd.set("is_labor", "1");
       const result = await addWorksheetLine(worksheetId, jobId, fd);
-      if (result?.error) {
-        toast.error(result.error);
-      } else if ("line" in result && result.line) {
+      if ("line" in result && result.line) {
         setLines(ls => [...ls, result.line as Line]);
         setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_labor: false, material_id: "" });
-        toast.success("Tétel hozzáadva.");
+        if (!("error" in result && result.error)) toast.success("Tétel hozzáadva.");
+      }
+      if ("error" in result && result.error) {
+        toast.error(result.error);
       }
     });
   }

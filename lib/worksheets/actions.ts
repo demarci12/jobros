@@ -93,11 +93,13 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
       .from("materials").select("id")
       .eq("id", material_id).eq("company_id", ctx.companyId).maybeSingle();
     if (mat) {
-      await ctx.supabase.rpc("increment_stock", {
+      const { error: rpcError } = await ctx.supabase.rpc("increment_stock", {
         p_material_id: material_id,
         p_delta: -lineData.quantity,
       });
-      await ctx.supabase.from("stock_movements").insert({
+      if (rpcError) return { error: `Készlet-csökkentés sikertelen: ${rpcError.message}`, line: insertedLine };
+
+      const { error: movErr } = await ctx.supabase.from("stock_movements").insert({
         company_id: ctx.companyId,
         material_id,
         worksheet_id: worksheetId,
@@ -106,6 +108,7 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
         reason: "Munkalap tétel hozzáadás",
         created_by: ctx.userId,
       });
+      if (movErr) return { error: `Készlet-mozgás rögzítése sikertelen: ${movErr.message}`, line: insertedLine };
     }
   }
 

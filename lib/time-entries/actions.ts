@@ -41,7 +41,10 @@ export async function clockIn(jobId: string) {
     started_at: startedAt,
   }).select("id, technician_id, started_at, stopped_at, duration_min, note").single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "23505") return { error: "Már fut egy időmérő. Előbb állítsd le a jelenlegi munkát." };
+    return { error: error.message };
+  }
   revalidatePath(`/jobs/${jobId}/worksheet`);
   return { entry };
 }
@@ -62,7 +65,10 @@ export async function clockOut(entryId: string, jobId: string, note?: string) {
     .is("stopped_at", null)
     .select("id, technician_id, started_at, stopped_at, duration_min, note").single();
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (error.code === "PGRST116") return { error: "Az időmérő már le van állítva." };
+    return { error: error.message };
+  }
   revalidatePath(`/jobs/${jobId}/worksheet`);
   return { entry };
 }
