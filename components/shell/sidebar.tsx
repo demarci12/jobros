@@ -42,7 +42,14 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </Button>
       </div>
 
-      <ScrollArea className="flex-1 py-2">
+      {/* Hívás fogadása — menü tetején */}
+      {!collapsed && (
+        <div className="px-2 pt-2 pb-1 shrink-0">
+          <PhoneIntakeDialog fullWidth />
+        </div>
+      )}
+
+      <ScrollArea className="flex-1 py-1">
         <nav className="flex flex-col gap-0.5 px-2">
           {navItems.map((item) => (
             <NavLink key={item.href} item={item} collapsed={collapsed} pathname={pathname} />
@@ -51,11 +58,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </ScrollArea>
 
       <div className="border-t py-2 px-2 shrink-0 space-y-1.5">
-        {!collapsed && (
-          <div className="w-full">
-            <PhoneIntakeDialog fullWidth />
-          </div>
-        )}
         <NavLink item={settingsItem} collapsed={collapsed} pathname={pathname} />
         <form action={signOut}>
           <button
