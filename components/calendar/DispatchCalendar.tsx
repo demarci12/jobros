@@ -204,59 +204,133 @@ export function DispatchCalendar({
         </div>
 
         {/* Calendar grid */}
-        <div className="flex-1 overflow-auto border rounded-lg">
-          <div className="min-w-[600px]">
-            {/* Header row: days × technicians */}
-            <div className="sticky top-0 z-20 bg-background border-b" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * visibleTechs.length}, 1fr)` }}>
-              <div />
-              {days.flatMap(day =>
-                visibleTechs.map(tech => {
+        {selectedTechId === "all" ? (
+          // Mindenki nézet: egymás alatti naptárak technikusonként
+          <div className="flex-1 overflow-auto space-y-6">
+            {(technicians.length > 0 ? technicians : [{ id: "", name: "Nincs hozzárendelve" }]).map(tech => {
+              const techAppts = appointments.filter(a =>
+                a.technician_id === tech.id || (tech.id === "" && !a.technician_id)
+              );
+              const weekApptCount = techAppts.filter(a =>
+                days.some(d => sameDay(new Date(a.starts_at), d))
+              ).length;
+              return (
+                <div key={tech.id} className="border rounded-lg overflow-hidden">
+                  {/* Tech section header */}
+                  <div className="sticky top-0 z-20 bg-background border-b px-3 py-2 flex items-center gap-2">
+                    <span className="text-sm font-semibold">{tech.name}</span>
+                    {weekApptCount > 0 && (
+                      <span className="text-xs bg-muted text-muted-foreground rounded-full px-2 py-0.5">
+                        {weekApptCount} időpont
+                      </span>
+                    )}
+                  </div>
+                  {weekApptCount === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                      Ezen a héten nincs időpontja.
+                    </div>
+                  ) : (
+                    <div className="min-w-[500px]">
+                      {/* Day headers */}
+                      <div className="sticky top-[41px] z-10 bg-background border-b" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
+                        <div />
+                        {days.map(day => {
+                          const isToday = sameDay(day, new Date());
+                          return (
+                            <div key={day.toISOString()} className={`border-l px-1 py-1.5 text-center text-xs ${isToday ? "bg-blue-50" : ""}`}>
+                              <div className={`font-medium ${isToday ? "text-blue-600" : "text-muted-foreground"}`}>
+                                {day.toLocaleDateString("hu-HU", { weekday: "short", day: "numeric" })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {/* Time rows */}
+                      <div className="relative" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
+                        <div className="relative">
+                          {hours.map(h => (
+                            <div key={h} className="border-b text-right pr-1 text-xs text-muted-foreground" style={{ height: HOUR_HEIGHT }}>
+                              {h}:00
+                            </div>
+                          ))}
+                        </div>
+                        {days.map(day => {
+                          const colAppts = techAppts.filter(a => sameDay(new Date(a.starts_at), day));
+                          const isToday = sameDay(day, new Date());
+                          const dropId = `${tech.id}:${day.toISOString()}`;
+                          return (
+                            <div key={day.toISOString()}
+                              className={`relative border-l ${isToday ? "bg-blue-50/30" : ""}`}
+                              style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>
+                              {hours.map(h => (
+                                <div key={h} className="absolute w-full border-b" style={{ top: (h - DAY_START) * HOUR_HEIGHT, height: HOUR_HEIGHT }} />
+                              ))}
+                              {Array.from({ length: TOTAL_HOURS * 4 }, (_, i) => {
+                                const mins = i * 15;
+                                return (
+                                  <DroppableCell key={i} id={`${dropId}:${mins}`}
+                                    style={{ top: (mins / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 4 }} />
+                                );
+                              })}
+                              {colAppts.map(a => {
+                                const top = apptTop(a.starts_at, day);
+                                const height = Math.max(apptHeight(a.starts_at, a.ends_at), HOUR_HEIGHT / 4);
+                                if (top < 0 || top > TOTAL_HOURS * HOUR_HEIGHT) return null;
+                                return <DraggableAppt key={a.id} appt={a} top={top} height={height} />;
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          // Egyedi szerelő nézet: egységes rács
+          <div className="flex-1 overflow-auto border rounded-lg">
+            <div className="min-w-[600px]">
+              {/* Header row */}
+              <div className="sticky top-0 z-20 bg-background border-b" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
+                <div />
+                {days.map(day => {
                   const isToday = sameDay(day, new Date());
                   return (
-                    <div key={`${day.toISOString()}-${tech.id}`}
+                    <div key={day.toISOString()}
                       className={`border-l px-1 py-1.5 text-center text-xs ${isToday ? "bg-blue-50" : ""}`}>
                       <div className={`font-medium ${isToday ? "text-blue-600" : "text-muted-foreground"}`}>
                         {day.toLocaleDateString("hu-HU", { weekday: "short", day: "numeric" })}
                       </div>
-                      <div className="text-muted-foreground truncate">{tech.name}</div>
                     </div>
                   );
-                })
-              )}
-            </div>
-
-            {/* Time rows */}
-            <div className="relative" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * visibleTechs.length}, 1fr)` }}>
-              {/* Hour labels */}
-              <div className="relative">
-                {hours.map(h => (
-                  <div key={h} className="border-b text-right pr-1 text-xs text-muted-foreground" style={{ height: HOUR_HEIGHT }}>
-                    {h}:00
-                  </div>
-                ))}
+                })}
               </div>
-
-              {/* Day × Tech columns */}
-              {days.flatMap(day =>
-                visibleTechs.map(tech => {
+              {/* Time rows */}
+              <div className="relative" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length}, 1fr)` }}>
+                <div className="relative">
+                  {hours.map(h => (
+                    <div key={h} className="border-b text-right pr-1 text-xs text-muted-foreground" style={{ height: HOUR_HEIGHT }}>
+                      {h}:00
+                    </div>
+                  ))}
+                </div>
+                {days.map(day => {
+                  const tech = visibleTechs[0];
                   const colAppts = appointments.filter(a =>
                     sameDay(new Date(a.starts_at), day) &&
                     (a.technician_id === tech.id || (tech.id === "" && !a.technician_id))
                   );
                   const isToday = sameDay(day, new Date());
                   const dropId = `${tech.id}:${day.toISOString()}`;
-
                   return (
-                    <div key={`${day.toISOString()}-${tech.id}`}
+                    <div key={day.toISOString()}
                       className={`relative border-l ${isToday ? "bg-blue-50/30" : ""}`}
                       style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>
-
-                      {/* Hour lines */}
                       {hours.map(h => (
                         <div key={h} className="absolute w-full border-b" style={{ top: (h - DAY_START) * HOUR_HEIGHT, height: HOUR_HEIGHT }} />
                       ))}
-
-                      {/* Drop target cells (15-min resolution) */}
                       {Array.from({ length: TOTAL_HOURS * 4 }, (_, i) => {
                         const mins = i * 15;
                         return (
@@ -264,23 +338,19 @@ export function DispatchCalendar({
                             style={{ top: (mins / 60) * HOUR_HEIGHT, height: HOUR_HEIGHT / 4 }} />
                         );
                       })}
-
-                      {/* Appointments */}
                       {colAppts.map(a => {
                         const top = apptTop(a.starts_at, day);
                         const height = Math.max(apptHeight(a.starts_at, a.ends_at), HOUR_HEIGHT / 4);
                         if (top < 0 || top > TOTAL_HOURS * HOUR_HEIGHT) return null;
-                        return (
-                          <DraggableAppt key={a.id} appt={a} top={top} height={height} />
-                        );
+                        return <DraggableAppt key={a.id} appt={a} top={top} height={height} />;
                       })}
                     </div>
                   );
-                })
-              )}
+                })}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       <DragOverlay>
