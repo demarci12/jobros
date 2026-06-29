@@ -32,7 +32,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold">Irányítópult</h1>
+      <div className="border-b pb-4">
+        <h1 className="text-xl font-semibold">Irányítópult</h1>
+      </div>
 
       <Suspense fallback={<KpiSkeleton />}>
         <KpiCards />

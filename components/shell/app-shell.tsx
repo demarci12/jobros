@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Sidebar } from "./sidebar";
 import { MobileNav } from "./mobile-nav";
+import { PhoneIntakeDialog } from "@/components/intake/PhoneIntakeDialog";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -15,7 +16,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* Mobile topbar */}
         <header className="lg:hidden flex h-14 items-center border-b px-4 gap-3 shrink-0">
           <MobileNav />
-          <span className="font-semibold text-base">Jobro</span>
+          <span className="font-semibold text-base flex-1">Jobro</span>
+          <div className="shrink-0">
+            <PhoneIntakeDialog />
+          </div>
         </header>
 
         {/* Page content */}

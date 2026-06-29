@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { PanelLeftClose, PanelLeftOpen, LogOut } from "lucide-react";
 import { signOut } from "@/lib/auth-actions";
+import { PhoneIntakeDialog } from "@/components/intake/PhoneIntakeDialog";
 
 interface SidebarProps {
   collapsed: boolean;
@@ -49,7 +50,12 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </nav>
       </ScrollArea>
 
-      <div className="border-t py-2 px-2 shrink-0 space-y-0.5">
+      <div className="border-t py-2 px-2 shrink-0 space-y-1.5">
+        {!collapsed && (
+          <div className="w-full">
+            <PhoneIntakeDialog fullWidth />
+          </div>
+        )}
         <NavLink item={settingsItem} collapsed={collapsed} pathname={pathname} />
         <form action={signOut}>
           <button
