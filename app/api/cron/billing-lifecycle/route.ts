@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
     const { sendNotification } = await import("@/lib/notifications/send");
     await sendNotification({
       companyId: sub.company_id,
-      event: "trial_ending" as any,
+      event: "trial_ending",
       recipient: email,
       channel: "email",
       vars: {
