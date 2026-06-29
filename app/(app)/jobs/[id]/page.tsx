@@ -4,6 +4,7 @@ import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Badge } from "@/components/ui/badge";
 import { User, MapPin, Wrench, Calendar } from "lucide-react";
 import { type JobStatus } from "@/lib/jobs/status-machine";
+import { EquipmentSelector } from "@/components/jobs/EquipmentSelector";
 
 export default async function JobOverviewPage({ params }: { params: { id: string } }) {
   const ctx = await getAuthContext();
@@ -13,7 +14,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
   const { data: job } = await supabase
     .from("jobs")
     .select(`
-      id, description, created_at,
+      id, description, created_at, equipment_id,
       customers(id, name, phone, email),
       sites(id, address, city),
       services(name)
@@ -22,6 +23,8 @@ export default async function JobOverviewPage({ params }: { params: { id: string
     .eq("company_id", companyId)
     .maybeSingle();
   if (!job) notFound();
+
+  const canEdit = ["owner", "dispatcher"].includes(role);
 
   const { data: appointments } = await supabase
     .from("appointments")
@@ -77,6 +80,16 @@ export default async function JobOverviewPage({ params }: { params: { id: string
         {job.description && (
           <p className="text-sm text-muted-foreground pl-7">{job.description}</p>
         )}
+
+        {/* Equipment selector — which device is being serviced */}
+        {(equipment ?? []).length > 0 && (
+          <EquipmentSelector
+            jobId={params.id}
+            equipment={(equipment ?? []) as any}
+            selectedId={(job as any).equipment_id ?? null}
+            canEdit={canEdit}
+          />
+        )}
       </div>
 
       {/* Időpontok */}
@@ -98,28 +111,6 @@ export default async function JobOverviewPage({ params }: { params: { id: string
         </div>
       )}
 
-      {/* Berendezések a helyszínen */}
-      {(equipment ?? []).length > 0 && (
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Berendezések</h2>
-          <ul className="space-y-1">
-            {(equipment ?? []).map((e: any) => {
-              const overdue = e.next_service_due && new Date(e.next_service_due) < new Date();
-              return (
-                <li key={e.id} className="flex items-center gap-3 text-sm border rounded-md px-3 py-2">
-                  <span className="font-medium">{e.manufacturer}{e.model ? ` ${e.model}` : ""}</span>
-                  {e.serial_number && <span className="text-muted-foreground text-xs">S/N: {e.serial_number}</span>}
-                  {e.next_service_due && (
-                    <span className={`text-xs ml-auto ${overdue ? "text-red-600 font-medium" : "text-muted-foreground"}`}>
-                      Szerv.: {new Date(e.next_service_due).toLocaleDateString("hu-HU")}
-                    </span>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }

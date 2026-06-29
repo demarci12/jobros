@@ -16,6 +16,7 @@ const createJobSchema = z.object({
   customer_id: z.string().uuid(),
   site_id: z.string().uuid(),
   service_id: z.string().uuid().optional().nullable(),
+  equipment_id: z.string().uuid().optional().nullable(),
   title: z.string().optional(),
   description: z.string().optional(),
   assigned_to: z.string().uuid().optional().nullable(),
@@ -68,6 +69,7 @@ export async function updateJob(jobId: string, formData: FormData) {
 
   const parsed = createJobSchema.partial().safeParse({
     service_id: formData.get("service_id") || null,
+    equipment_id: formData.get("equipment_id") || null,
     title: formData.get("title") || undefined,
     description: formData.get("description") || undefined,
     assigned_to: formData.get("assigned_to") || null,

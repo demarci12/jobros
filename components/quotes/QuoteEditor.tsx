@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef } from "react";
 import {
   createQuote, addQuoteLine, toggleLineSelected, deleteQuoteLine, updateQuoteStatus,
 } from "@/lib/quotes/actions";
@@ -8,8 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Send, CheckCircle, XCircle, Download } from "lucide-react";
+import { Trash2, Plus, Send, CheckCircle, XCircle, Download, Package } from "lucide-react";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
+
+type Material = { id: string; name: string; unit: string; unit_price: number; vat_rate: number; stock_qty: number };
 
 type QuoteLine = {
   id: string;
@@ -41,6 +44,11 @@ const VAT_OPTIONS = [0, 5, 18, 27];
 export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: string; initialQuote: Quote | null; canEdit?: boolean }) {
   const [isPending, startTransition] = useTransition();
   const [quote, setQuote] = useState<Quote | null>(initialQuote);
+  const [materialQuery, setMaterialQuery] = useState("");
+  const [materialResults, setMaterialResults] = useState<Material[]>([]);
+  const [materialSearching, setMaterialSearching] = useState(false);
+  const [showMaterialPicker, setShowMaterialPicker] = useState(false);
+  const matTimer = useRef<ReturnType<typeof setTimeout>>();
   const [newLine, setNewLine] = useState({
     description: "", quantity: "1", unit: "db",
     unit_price: "0", vat_rate: "27", is_optional: false, option_group: "",
@@ -115,6 +123,38 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
         toast.success(`Állapot: ${STATUS_LABELS[status]}`);
       }
     });
+  }
+
+  function handleMaterialQuery(q: string) {
+    setMaterialQuery(q);
+    clearTimeout(matTimer.current);
+    if (q.trim().length < 2) { setMaterialResults([]); return; }
+    setMaterialSearching(true);
+    matTimer.current = setTimeout(async () => {
+      const sb = createClient();
+      const { data } = await sb
+        .from("materials")
+        .select("id, name, unit, unit_price, vat_rate, stock_qty")
+        .ilike("name", `%${q.trim()}%`)
+        .eq("is_active", true)
+        .order("name")
+        .limit(15);
+      setMaterialResults((data as Material[]) ?? []);
+      setMaterialSearching(false);
+    }, 250);
+  }
+
+  function selectMaterial(m: Material) {
+    setNewLine(s => ({
+      ...s,
+      description: m.name,
+      unit: m.unit,
+      unit_price: String(m.unit_price),
+      vat_rate: String(m.vat_rate),
+    }));
+    setMaterialQuery("");
+    setMaterialResults([]);
+    setShowMaterialPicker(false);
   }
 
   if (!quote) {
@@ -244,7 +284,53 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
       {/* Új tétel */}
       {canEdit && quote.status === "draft" && (
         <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
-          <p className="text-xs font-medium text-muted-foreground">Új tétel</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-muted-foreground">Új tétel</p>
+            <button
+              type="button"
+              onClick={() => { setShowMaterialPicker(v => !v); setMaterialQuery(""); setMaterialResults([]); }}
+              className="flex items-center gap-1 text-xs text-primary hover:underline"
+            >
+              <Package size={12} /> Raktárból
+            </button>
+          </div>
+
+          {/* Material picker */}
+          {showMaterialPicker && (
+            <div className="space-y-1.5">
+              <Input
+                autoFocus
+                className="h-8"
+                placeholder="Keress anyagot, alkatrészt…"
+                value={materialQuery}
+                onChange={e => handleMaterialQuery(e.target.value)}
+              />
+              {materialSearching && <p className="text-xs text-muted-foreground">Keresés…</p>}
+              {materialResults.length > 0 && (
+                <ul className="rounded-md border divide-y max-h-40 overflow-y-auto bg-background">
+                  {materialResults.map(m => (
+                    <li key={m.id}>
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 flex items-center justify-between gap-2"
+                        onClick={() => selectMaterial(m)}
+                      >
+                        <span className="font-medium truncate">{m.name}</span>
+                        <span className="text-xs text-muted-foreground shrink-0">
+                          {m.unit_price.toLocaleString("hu-HU")} Ft/{m.unit}
+                          {" · "}készlet: {m.stock_qty}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {materialQuery.length >= 2 && !materialSearching && materialResults.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nem találtunk ilyen anyagot.</p>
+              )}
+            </div>
+          )}
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="col-span-2 sm:col-span-4 space-y-1">
               <Label className="text-xs">Megnevezés</Label>
