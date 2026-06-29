@@ -65,6 +65,14 @@ export function DispatchCalendar({
   const [pivotDate, setPivotDate] = useState(() => { const d = new Date(); d.setHours(0,0,0,0); return d; });
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [activeAppt, setActiveAppt] = useState<Appointment | null>(null);
+  // "all" or a specific technician id
+  const [selectedTechId, setSelectedTechId] = useState<string>("all");
+
+  const visibleTechs = selectedTechId === "all"
+    ? (technicians.length > 0 ? technicians : [{ id: "", name: "Nincs hozzárendelve" }])
+    : (technicians.find(t => t.id === selectedTechId)
+        ? [technicians.find(t => t.id === selectedTechId)!]
+        : [{ id: "", name: "Nincs hozzárendelve" }]);
 
   const supabaseRef = useRef(createClient());
 
@@ -163,6 +171,28 @@ export function DispatchCalendar({
               ? `${startOfWeek(pivotDate).toLocaleDateString("hu-HU", { month: "long", day: "numeric" })} – ${addDays(startOfWeek(pivotDate), 6).toLocaleDateString("hu-HU", { month: "long", day: "numeric" })}`
               : pivotDate.toLocaleDateString("hu-HU", { year: "numeric", month: "long", day: "numeric" })}
           </span>
+          {/* Technician switcher */}
+          {technicians.length > 1 && (
+            <div className="flex rounded-md border overflow-hidden">
+              <button
+                className={`px-3 h-8 text-xs font-medium transition-colors ${selectedTechId === "all" ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                onClick={() => setSelectedTechId("all")}
+              >
+                Mindenki
+              </button>
+              {technicians.map(t => (
+                <button
+                  key={t.id}
+                  className={`px-3 h-8 text-xs font-medium border-l transition-colors truncate max-w-[110px] ${selectedTechId === t.id ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}
+                  onClick={() => setSelectedTechId(t.id)}
+                  title={t.name}
+                >
+                  {t.name.split(" ")[0]}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="ml-auto flex gap-1">
             <Button variant={viewMode === "day" ? "default" : "outline"} size="sm" onClick={() => setViewMode("day")}>
               <CalendarDays size={14} className="mr-1" /> Nap
@@ -177,10 +207,10 @@ export function DispatchCalendar({
         <div className="flex-1 overflow-auto border rounded-lg">
           <div className="min-w-[600px]">
             {/* Header row: days × technicians */}
-            <div className="sticky top-0 z-20 bg-background border-b" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * Math.max(technicians.length, 1)}, 1fr)` }}>
+            <div className="sticky top-0 z-20 bg-background border-b" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * visibleTechs.length}, 1fr)` }}>
               <div />
               {days.flatMap(day =>
-                (technicians.length > 0 ? technicians : [{ id: "", name: "Nincs hozzárendelve" }]).map(tech => {
+                visibleTechs.map(tech => {
                   const isToday = sameDay(day, new Date());
                   return (
                     <div key={`${day.toISOString()}-${tech.id}`}
@@ -196,7 +226,7 @@ export function DispatchCalendar({
             </div>
 
             {/* Time rows */}
-            <div className="relative" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * Math.max(technicians.length, 1)}, 1fr)` }}>
+            <div className="relative" style={{ display: "grid", gridTemplateColumns: `48px repeat(${days.length * visibleTechs.length}, 1fr)` }}>
               {/* Hour labels */}
               <div className="relative">
                 {hours.map(h => (
@@ -208,7 +238,7 @@ export function DispatchCalendar({
 
               {/* Day × Tech columns */}
               {days.flatMap(day =>
-                (technicians.length > 0 ? technicians : [{ id: "", name: "" }]).map(tech => {
+                visibleTechs.map(tech => {
                   const colAppts = appointments.filter(a =>
                     sameDay(new Date(a.starts_at), day) &&
                     (a.technician_id === tech.id || (tech.id === "" && !a.technician_id))
