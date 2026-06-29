@@ -158,6 +158,7 @@ export function CalendarShell({
             initialAppointments={initialAppointments}
             technicians={technicians}
             companyId={companyId}
+            onSlotClick={() => setBookingOpen(true)}
           />
         )}
 

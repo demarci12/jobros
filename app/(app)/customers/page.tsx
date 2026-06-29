@@ -23,7 +23,15 @@ async function CustomersList({ q }: { q: string }) {
 
   if (q) query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%`);
 
-  const { data: customers } = await query;
+  const { data: customers, error } = await query;
+
+  if (error && !customers) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+        Adatok betöltése sikertelen. Frissítsd az oldalt, vagy próbáld újra.
+      </div>
+    );
+  }
 
   if ((customers ?? []).length === 0) {
     return <EmptyState icon={Users} title="Még nincs ügyfél" description="Telefon-intake-kel adj hozzá az első ügyfelet." />;

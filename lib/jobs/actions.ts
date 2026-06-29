@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { assertTransition, type JobStatus } from "./status-machine";
+import { checkEntitlement } from "@/lib/billing/entitlements";
 
 async function getJobCtx(roles = ["owner", "dispatcher", "technician"] as string[]) {
   const ctx = await getAuthContext();
@@ -25,6 +26,11 @@ const createJobSchema = z.object({
 export async function createJob(formData: FormData) {
   const ctx = await getJobCtx(["owner", "dispatcher"]);
   if (!ctx) return { error: "Nincs jogosultság." };
+
+  const ent = await checkEntitlement(ctx.companyId, "technicians");
+  if (!ent.allowed && ent.reason === "read_only") {
+    return { error: "Az előfizetés lejárt vagy felfüggesztett — új munka nem hozható létre." };
+  }
 
   const parsed = createJobSchema.safeParse({
     customer_id: formData.get("customer_id"),
@@ -105,8 +111,19 @@ export async function transitionJob(jobId: string, toStatus: JobStatus) {
     return { error: (e as Error).message };
   }
 
+  if (toStatus === "szamlazva") {
+    const { count } = await ctx.supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("job_id", jobId)
+      .eq("company_id", ctx.companyId);
+    if ((count ?? 0) === 0) {
+      return { error: "Előbb állíts ki számlát a munkához." };
+    }
+  }
+
   const { error } = await ctx.supabase.from("jobs")
-    .update({ status: toStatus }).eq("id", jobId);
+    .update({ status: toStatus }).eq("company_id", ctx.companyId).eq("id", jobId);
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");

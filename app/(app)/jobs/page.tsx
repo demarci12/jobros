@@ -44,7 +44,15 @@ async function JobsList({ activeStatus }: { activeStatus?: JobStatus }) {
   if (activeStatus) query = query.eq("status", activeStatus);
   if (role === "technician") query = query.eq("assigned_to", user.id);
 
-  const { data: jobs } = await query;
+  const { data: jobs, error } = await query;
+
+  if (error && !jobs) {
+    return (
+      <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+        Adatok betöltése sikertelen. Frissítsd az oldalt, vagy próbáld újra.
+      </div>
+    );
+  }
 
   if ((jobs ?? []).length === 0) {
     return (

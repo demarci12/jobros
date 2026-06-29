@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { revalidatePath } from "next/cache";
+import { checkEntitlement } from "@/lib/billing/entitlements";
 
 const CreateBookingSchema = z.object({
   customerId: z.string().uuid(),
@@ -25,6 +26,10 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
 
   const ctx = await getAuthContext();
   if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
+  const ent = await checkEntitlement(ctx.companyId, "technicians");
+  if (!ent.allowed && ent.reason === "read_only") {
+    return { error: "Az előfizetés lejárt vagy felfüggesztett — foglalás nem hozható létre." };
+  }
   const { supabase, companyId, user } = ctx;
   const cu = { company_id: companyId, role: ctx.role };
 
@@ -45,48 +50,40 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
     return `${year}-${((count ?? 0) + 1).toString().padStart(4, "0")}`;
   }
 
-  // Create job with retry on unique conflict (race condition guard)
   let jobNumber = await generateJobNumber();
   let job: { id: string } | null = null;
   let jobError: any = null;
 
   for (let attempt = 0; attempt < 3; attempt++) {
-    const result = await supabase.from("jobs").insert({
-      company_id: cu.company_id,
-      job_number: jobNumber,
-      customer_id: customerId,
-      site_id: siteId,
-      service_id: serviceId,
-      equipment_id: equipmentId,
-      title,
-      assigned_to: technicianId,
-      created_by: user.id,
-      status: kind === "felmeres" ? "felmeres" : "utemezve",
-    }).select("id").single();
-    if (!result.error) { job = result.data; break; }
-    if (result.error.code === "23505") {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('create_job_with_appointment', {
+      p_company_id: cu.company_id,
+      p_job_number: jobNumber,
+      p_customer_id: customerId,
+      p_site_id: siteId,
+      p_service_id: serviceId ?? null,
+      p_equipment_id: equipmentId ?? null,
+      p_title: title,
+      p_assigned_to: technicianId ?? null,
+      p_created_by: user.id,
+      p_status: kind === 'felmeres' ? 'felmeres' : 'utemezve',
+      p_kind: kind,
+      p_starts_at: startsAt,
+      p_ends_at: endsAt,
+    });
+    if (!rpcError) {
+      job = { id: (rpcResult as any).job_id };
+      break;
+    }
+    if (rpcError.code === '23505') {
       jobNumber = await generateJobNumber();
-      jobError = result.error;
+      jobError = rpcError;
       continue;
     }
-    jobError = result.error; break;
+    jobError = rpcError;
+    break;
   }
 
-  if (!job) return { error: jobError?.code === "23505" ? "Foglalási szám ütközés, próbáld újra." : jobError?.message ?? "Hiba." };
-
-  // Create appointment
-  const { error: apptError } = await supabase
-    .from("appointments")
-    .insert({
-      company_id: cu.company_id,
-      job_id: job.id,
-      kind,
-      technician_id: technicianId,
-      starts_at: startsAt,
-      ends_at: endsAt,
-    });
-
-  if (apptError) return { error: apptError.message };
+  if (!job) return { error: jobError?.code === '23505' ? 'Foglalási szám ütközés, próbáld újra.' : jobError?.message ?? 'Hiba.' };
 
   revalidatePath("/calendar");
   revalidatePath("/dashboard");

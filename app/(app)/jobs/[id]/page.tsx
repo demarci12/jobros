@@ -93,7 +93,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
       </div>
 
       {/* Időpontok */}
-      {(appointments ?? []).length > 0 && (
+      {(appointments ?? []).length > 0 ? (
         <div>
           <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Időpontok</h2>
           <ul className="space-y-1">
@@ -108,6 +108,13 @@ export default async function JobOverviewPage({ params }: { params: { id: string
               </li>
             ))}
           </ul>
+        </div>
+      ) : canEdit && (
+        <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
+          <p className="text-sm text-muted-foreground">Nincs ütemezett időpont ehhez a munkához.</p>
+          <Link href="/calendar" className="text-sm font-medium text-primary hover:underline">
+            Időpontot foglal a naptárban →
+          </Link>
         </div>
       )}
 

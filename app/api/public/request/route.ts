@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { z } from "zod";
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
 
 const RequestSchema = z.object({
   slug: z.string().min(1).max(100),
@@ -12,27 +14,28 @@ const RequestSchema = z.object({
   message: z.string().max(2000).optional().nullable(),
 });
 
-// Simple in-memory rate limit: max 5 submissions per IP per 10 min
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT = 5;
-const RATE_WINDOW_MS = 10 * 60 * 1000;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
-    return true;
+function getRatelimiter(): Ratelimit | null {
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
+    return null;
   }
-  if (entry.count >= RATE_LIMIT) return false;
-  entry.count++;
-  return true;
+  return new Ratelimit({
+    redis: new Redis({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    }),
+    limiter: Ratelimit.slidingWindow(5, "10 m"),
+    prefix: "jobro:public-request",
+  });
 }
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ error: "Túl sok kérés. Kérjük, próbálja újra később." }, { status: 429 });
+  const limiter = getRatelimiter();
+  if (limiter) {
+    const { success } = await limiter.limit(ip);
+    if (!success) {
+      return NextResponse.json({ error: "Túl sok kérés. Kérjük, próbálja újra később." }, { status: 429 });
+    }
   }
 
   let body: unknown;

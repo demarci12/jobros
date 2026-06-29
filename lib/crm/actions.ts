@@ -46,43 +46,58 @@ export async function createQuickCustomer(formData: FormData) {
 
   const name = (formData.get("name") as string)?.trim();
   const phone = (formData.get("phone") as string)?.trim() || null;
+  const email = (formData.get("email") as string)?.trim() || null;
   const address = (formData.get("address") as string)?.trim();
   const city = (formData.get("city") as string)?.trim() || null;
 
   if (!name) return { error: "Név kötelező." };
   if (!address) return { error: "Cím kötelező." };
 
-  // Run customer insert + geocoding in parallel
-  const [{ data: customer, error: custErr }, geo] = await Promise.all([
-    ctx.supabase.from("customers")
-      .insert({ company_id: ctx.companyId, name, phone })
-      .select("id").single(),
-    geocodeWithTimeout(address, city ?? undefined),
-  ]);
-  if (custErr || !customer) return { error: custErr?.message ?? "Hiba." };
+  const geo = await geocodeWithTimeout(address, city ?? undefined);
 
-  const lat = geo?.lat ?? null;
-  const lng = geo?.lng ?? null;
-  const h3_index = geo ? toH3(geo.lat, geo.lng) : null;
-
-  const { error: siteErr } = await ctx.supabase.from("sites").insert({
-    company_id: ctx.companyId,
-    customer_id: customer.id,
-    address,
-    city,
-    lat,
-    lng,
-    h3_index,
+  const { data: result, error: rpcErr } = await ctx.supabase.rpc("create_customer_with_site", {
+    p_company_id: ctx.companyId,
+    p_name: name,
+    p_phone: phone ?? "",
+    p_email: email ?? "",
+    p_address: address,
+    p_city: city ?? "",
+    p_lat: geo?.lat ?? 0,
+    p_lng: geo?.lng ?? 0,
+    p_h3_index: geo ? toH3(geo.lat, geo.lng) : "",
   });
 
-  if (siteErr) {
-    // Roll back the customer if site creation fails — leave no orphan
-    await ctx.supabase.from("customers").delete().eq("id", customer.id);
-    return { error: `Helyszín mentése sikertelen: ${siteErr.message}` };
-  }
+  if (rpcErr || !result) return { error: rpcErr?.message ?? "Hiba." };
+
+  const { customer_id, site_id } = result as { customer_id: string; site_id: string };
 
   revalidatePath("/customers");
-  return { id: customer.id };
+  return { id: customer_id, site_id, name, phone };
+}
+
+export async function getSiteForCustomer(customerId: string) {
+  const ctx = await getCompanyCtx(["owner", "dispatcher", "technician"]);
+  if (!ctx) return null;
+  const { data } = await ctx.supabase
+    .from("sites")
+    .select("id")
+    .eq("customer_id", customerId)
+    .eq("company_id", ctx.companyId)
+    .limit(1)
+    .maybeSingle();
+  return data?.id ?? null;
+}
+
+export async function getServicesForIntake() {
+  const ctx = await getCompanyCtx(["owner", "dispatcher"]);
+  if (!ctx) return [];
+  const { data } = await ctx.supabase
+    .from("services")
+    .select("id, name")
+    .eq("company_id", ctx.companyId)
+    .eq("is_active", true)
+    .order("name");
+  return data ?? [];
 }
 
 // --- Customer CRUD ---

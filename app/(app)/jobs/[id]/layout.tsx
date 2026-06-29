@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Button } from "@/components/ui/button";
 import { JobStatusPipeline } from "@/components/jobs/JobStatusPipeline";
 import { SheetTabs } from "@/components/jobs/SheetTabs";
@@ -14,24 +14,19 @@ export default async function JobDetailLayout({
   children: React.ReactNode;
   params: { id: string };
 }) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-
-  const { data: cu } = await supabase
-    .from("company_users").select("company_id, role")
-    .eq("user_id", user.id).eq("is_active", true).limit(1).maybeSingle();
-  if (!cu) redirect("/dashboard");
+  const ctx = await getAuthContext();
+  if (!ctx) redirect("/login");
+  const { supabase, companyId, role, user } = ctx;
 
   const { data: job } = await supabase
     .from("jobs")
     .select("id, job_number, title, status, assigned_to, customers(id, name)")
     .eq("id", params.id)
-    .eq("company_id", cu.company_id)
+    .eq("company_id", companyId)
     .maybeSingle();
   if (!job) notFound();
 
-  const canEdit = ["owner", "dispatcher"].includes(cu.role);
+  const canEdit = ["owner", "dispatcher"].includes(role);
 
   return (
     <div className="flex flex-col min-h-0">
@@ -65,7 +60,7 @@ export default async function JobDetailLayout({
               canEdit={canEdit}
               assignedTo={job.assigned_to}
               currentUserId={user.id}
-              currentUserRole={cu.role}
+              currentUserRole={role}
             />
           </div>
         </div>

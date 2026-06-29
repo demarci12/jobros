@@ -52,14 +52,26 @@ function apptHeight(starts_at: string, ends_at: string): number {
 
 function sameDay(a: Date, b: Date) { return a.toDateString() === b.toDateString(); }
 
+function slotTimesFromClick(e: React.MouseEvent<HTMLElement>, day: Date): { startsAt: string; endsAt: string } {
+  const rect = e.currentTarget.getBoundingClientRect();
+  const y = e.clientY - rect.top;
+  const totalMinutes = Math.max(0, Math.min(Math.round((y / HOUR_HEIGHT) * 60 / 15) * 15, TOTAL_HOURS * 60 - 60));
+  const start = new Date(day);
+  start.setHours(DAY_START + Math.floor(totalMinutes / 60), totalMinutes % 60, 0, 0);
+  const end = new Date(start.getTime() + 60 * 60 * 1000);
+  return { startsAt: start.toISOString(), endsAt: end.toISOString() };
+}
+
 export function DispatchCalendar({
   initialAppointments,
   technicians,
   companyId,
+  onSlotClick,
 }: {
   initialAppointments: Appointment[];
   technicians: Technician[];
   companyId: string;
+  onSlotClick?: (startsAt: string, endsAt: string, technicianId: string | null) => void;
 }) {
   const [viewMode, setViewMode] = useState<"day" | "week">("week");
   const [pivotDate, setPivotDate] = useState(() => { const d = new Date(); d.setHours(0,0,0,0); return d; });
@@ -226,8 +238,17 @@ export function DispatchCalendar({
                     )}
                   </div>
                   {weekApptCount === 0 ? (
-                    <div className="py-8 text-center text-sm text-muted-foreground">
-                      Ezen a héten nincs időpontja.
+                    <div
+                      className={`py-8 text-center text-sm text-muted-foreground ${onSlotClick ? "cursor-pointer hover:bg-muted/30" : ""}`}
+                      onClick={onSlotClick ? () => {
+                        const now = new Date();
+                        const start = new Date(now);
+                        start.setMinutes(Math.ceil(start.getMinutes() / 15) * 15, 0, 0);
+                        const end = new Date(start.getTime() + 60 * 60 * 1000);
+                        onSlotClick(start.toISOString(), end.toISOString(), tech.id || null);
+                      } : undefined}
+                    >
+                      Ezen a héten nincs időpontja.{onSlotClick ? " Kattints új foglaláshoz." : ""}
                     </div>
                   ) : (
                     <div className="min-w-[500px]">
@@ -260,8 +281,13 @@ export function DispatchCalendar({
                           const dropId = `${tech.id}:${day.toISOString()}`;
                           return (
                             <div key={day.toISOString()}
-                              className={`relative border-l ${isToday ? "bg-blue-50/30" : ""}`}
-                              style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}>
+                              className={`relative border-l ${isToday ? "bg-blue-50/30" : ""} ${onSlotClick ? "cursor-pointer" : ""}`}
+                              style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}
+                              onClick={onSlotClick ? (e) => {
+                                if ((e.target as HTMLElement).closest("a,button,[data-draggable]")) return;
+                                const { startsAt, endsAt } = slotTimesFromClick(e, day);
+                                onSlotClick(startsAt, endsAt, tech.id || null);
+                              } : undefined}>
                               {hours.map(h => (
                                 <div key={h} className="absolute w-full border-b" style={{ top: (h - DAY_START) * HOUR_HEIGHT, height: HOUR_HEIGHT }} />
                               ))}

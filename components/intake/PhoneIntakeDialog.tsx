@@ -9,8 +9,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Search, UserPlus, ChevronRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-import { searchCustomers, createQuickCustomer } from "@/lib/crm/actions";
+import { searchCustomers, createQuickCustomer, getSiteForCustomer, getServicesForIntake } from "@/lib/crm/actions";
 import { createJob } from "@/lib/jobs/actions";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 type Customer = { id: string; name: string; phone: string | null; email: string | null };
 
@@ -24,14 +25,15 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   const [searching, setSearching] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerId, setCustomerId] = useState<string | null>(null);
+  const [siteId, setSiteId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Services fetched lazily when job step opens — passed via prop in production;
-  // for intake we create a bare job (service_id optional)
   const [jobTitle, setJobTitle] = useState("");
   const [jobNote, setJobNote] = useState("");
+  const [services, setServices] = useState<{ id: string; name: string }[]>([]);
+  const [jobServiceId, setJobServiceId] = useState<string>("");
 
   function reset() {
     setStep("search");
@@ -39,8 +41,10 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
     setResults([]);
     setSelectedCustomer(null);
     setCustomerId(null);
+    setSiteId(null);
     setJobTitle("");
     setJobNote("");
+    setJobServiceId("");
   }
 
   function handleOpen(v: boolean) {
@@ -63,6 +67,8 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   function selectCustomer(c: Customer) {
     setSelectedCustomer(c);
     setCustomerId(c.id);
+    getSiteForCustomer(c.id).then(setSiteId);
+    getServicesForIntake().then(setServices);
     setStep("job");
   }
 
@@ -92,9 +98,12 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
       fd.set("city", ncCity);
       const res = await createQuickCustomer(fd);
       if ("error" in res && res.error) { toast.error(res.error); return; }
-      const newCustomer: Customer = { id: (res as any).id, name: ncName, phone: ncPhone || null, email: ncEmail || null };
+      const { id, site_id: newSiteId } = res as { id: string; site_id: string; name: string; phone: string | null };
+      const newCustomer: Customer = { id, name: ncName, phone: ncPhone || null, email: ncEmail || null };
       setSelectedCustomer(newCustomer);
-      setCustomerId((res as any).id);
+      setCustomerId(id);
+      setSiteId(newSiteId);
+      getServicesForIntake().then(setServices);
       setStep("job");
     });
   }
@@ -102,12 +111,6 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   function handleCreateJob() {
     if (!customerId) return;
     startTransition(async () => {
-      // We need a site_id — for quick intake we grab the first site of this customer.
-      // In a full flow this would be a site selector; for phone intake speed takes priority.
-      const { createClient } = await import("@/lib/supabase/client");
-      const sb = createClient();
-      const { data: sites } = await sb.from("sites").select("id").eq("customer_id", customerId).limit(1);
-      const siteId = sites?.[0]?.id;
       if (!siteId) {
         toast.error("Az ügyfélhez nincs rögzített helyszín. Előbb add hozzá a CRM-ben.");
         return;
@@ -117,6 +120,7 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
       fd.set("site_id", siteId);
       if (jobTitle) fd.set("title", jobTitle);
       if (jobNote) fd.set("description", jobNote);
+      if (jobServiceId) fd.set("service_id", jobServiceId);
       const res = await createJob(fd);
       if ("error" in res && res.error) { toast.error(res.error); return; }
       toast.success("Munka létrehozva!");
@@ -278,6 +282,16 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
                 {selectedCustomer.phone && (
                   <span className="text-xs text-muted-foreground ml-auto">{selectedCustomer.phone}</span>
                 )}
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Szolgáltatás</Label>
+                <Select value={jobServiceId} onValueChange={v => setJobServiceId(v ?? "")}>
+                  <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást..." /></SelectTrigger>
+                  <SelectContent>
+                    {services.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="space-y-1">

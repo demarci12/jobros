@@ -33,7 +33,7 @@ export default async function MyDayPage() {
     query = query.eq("technician_id", user.id);
   }
 
-  const { data: appointments } = await query;
+  const { data: appointments, error } = await query;
 
   const today = new Date().toLocaleDateString("hu-HU", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
 
@@ -44,7 +44,13 @@ export default async function MyDayPage() {
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </div>
 
-      <TechDayList appointments={(appointments ?? []) as any} />
+      {error && !appointments ? (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
+          Adatok betöltése sikertelen. Frissítsd az oldalt, vagy próbáld újra.
+        </div>
+      ) : (
+        <TechDayList appointments={(appointments ?? []) as any} />
+      )}
     </div>
   );
 }

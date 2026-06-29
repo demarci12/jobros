@@ -93,6 +93,26 @@ export async function deleteWorksheetLine(lineId: string, worksheetId: string, j
   const ctx = await getWorksheetCtx(jobId);
   if (!ctx?.canWrite) return { error: "Nincs jogosultság." };
 
+  const { data: ws } = await ctx.supabase
+    .from("worksheets")
+    .select("id")
+    .eq("id", worksheetId)
+    .eq("company_id", ctx.companyId)
+    .maybeSingle();
+
+  if (ws) {
+    const { data: sig } = await ctx.supabase
+      .from("signatures")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("signer_role", "customer")
+      .limit(1)
+      .maybeSingle();
+    if (sig) {
+      return { error: "A munkalap már aláírva — törlés nem lehetséges." };
+    }
+  }
+
   const { error } = await ctx.supabase.from("worksheet_lines")
     .delete().eq("id", lineId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };

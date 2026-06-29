@@ -64,39 +64,12 @@ export async function saveSignature({
       .eq("job_id", jobId).eq("company_id", ctx.companyId).maybeSingle();
 
     if (worksheet) {
-      const { data: materialLines } = await ctx.supabase
-        .from("worksheet_lines")
-        .select("material_id, quantity")
-        .eq("worksheet_id", worksheet.id)
-        .eq("company_id", ctx.companyId)
-        .not("material_id", "is", null);
-
-      // Idempotency: only deduct if no prior stock_movements for this worksheet
-      const { count: alreadyMoved } = await ctx.supabase
-        .from("stock_movements")
-        .select("id", { count: "exact", head: true })
-        .eq("worksheet_id", worksheet.id)
-        .eq("company_id", ctx.companyId);
-
-      if ((alreadyMoved ?? 0) === 0) {
-        for (const line of materialLines ?? []) {
-          if (!line.material_id || line.quantity <= 0) continue;
-          await Promise.all([
-            ctx.supabase.rpc("increment_stock", {
-              p_material_id: line.material_id,
-              p_delta: -line.quantity,
-            }),
-            ctx.supabase.from("stock_movements").insert({
-              company_id: ctx.companyId,
-              material_id: line.material_id,
-              worksheet_id: worksheet.id,
-              job_id: jobId,
-              quantity: -line.quantity,
-              reason: "Munkalap aláírva",
-              created_by: ctx.userId,
-            }),
-          ]);
-        }
+      const { error: stockErr } = await ctx.supabase.rpc("deduct_worksheet_stock", {
+        p_worksheet_id: worksheet.id,
+        p_user_id: ctx.userId,
+      });
+      if (stockErr && !stockErr.message?.includes("unique")) {
+        console.error("Stock deduction error:", stockErr);
       }
     }
   }
