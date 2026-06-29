@@ -21,8 +21,9 @@ A rendszerterv (v2.0) lebontva **Claude Code-méretű, sorba rendezett ticketekr
 | EPIC 4 — Naptár + Szerelő | ✅ T-40, T-42…45 | — | T-41 hó/térkép nézet |
 | EPIC 5 — App Store | ✅ T-50, T-51, T-54 | T-53 cron trigger | T-52 Google Calendar connector |
 | EPIC 6 — Dashboard + Export | ✅ T-60…63 | — | T-64 Edge Functions, T-65 audit+e2e |
+| EPIC 7 — CEO Audit Fixes | — | — | T-81…95 (15 ticket, CEO review 2026-06-29) |
 
-**Összesített MVP-haladás: ~85% kész.** Blokkoló hiányok: T-64 (dunning cron), T-65 (audit+pilot).
+**Összesített MVP-haladás: ~80% kész.** Blokkoló hiányok: T-81…87 (P0 kritikus), T-64 (dunning cron), T-65 (audit+pilot).
 
 ---
 
@@ -255,6 +256,87 @@ A rendszerterv (v2.0) lebontva **Claude Code-méretű, sorba rendezett ticketekr
 
 ---
 
+# EPIC 7 — CEO Audit Fixes (2026-06-29)
+
+> Kritikus hibák és UX lyukak a CEO-felülvizsgálatból. **Sprint A előtt kell megcsinálni** — ezek nélkül az MVP nem shippelhető.
+
+### T-81 ❌ [P0] Atomikus ügyfél+helyszín létrehozás (intake + foglalás) → T-12, T-22 👤 B1
+**Scope:** `createQuickCustomer` (lib/crm/actions.ts) és `createBooking` (components/booking/actions.ts) egymás utáni DB-írásokat végeznek tranzakció nélkül. Ha a második insert sikertelen, orphan sor marad. Postgres RPC-be kell csomagolni mindkettőt.
+**Fájlok:** `lib/crm/actions.ts`, `components/booking/actions.ts`, `supabase/migrations/0034_atomic_create_rpcs.sql`
+**Elfogadás:** `create_customer_with_site(...)` és `create_job_with_appointment(...)` RPC-k; ha bármelyik belső lépés sikertelen, a tranzakció visszagördül; nincs orphan sor; az action fájlok az RPC-t hívják.
+
+### T-82 ❌ [P0] site_id visszaadása createQuickCustomer-ből; client-side DB query eltávolítása → T-81 👤 B1
+**Scope:** `handleCreateJob` a `PhoneIntakeDialog`-ban dinamikusan importálja a `createClient()`-et és böngészőből query-zi a `sites` táblát hogy megkapja a `site_id`-t. Ez felesleges RTT és antiminta (server action + client DB query keverés). A `createQuickCustomer` visszatérési értékébe bele kell tenni a `site_id`-t.
+**Fájlok:** `lib/crm/actions.ts`, `components/intake/PhoneIntakeDialog.tsx`
+**Elfogadás:** `createQuickCustomer` visszaad `{ id, site_id }`; `handleCreateJob` közvetlenül használja ezt; nincs `createClient()` import a dialógusban.
+
+### T-83 ❌ [P0] transitionJob: company_id szűrő hozzáadása az UPDATE-hez → T-22 👤 B1
+**Scope:** `lib/jobs/actions.ts` `transitionJob` funkciójában az `UPDATE` nem szűr `company_id`-ra (a SELECT igen, de az UPDATE nem). Ha az RLS-ben valaha rés keletkezik, egy másik tenant job-ján is el lehet végezni a státuszváltást. Egy soros javítás.
+**Fájlok:** `lib/jobs/actions.ts`
+**Elfogadás:** `.eq("company_id", ctx.companyId)` az UPDATE sorában; teszt: idegen tenant job_id-val hívva 0 sort érint.
+
+### T-84 ❌ [P0] checkEntitlement implementálása + hívása → T-07 👤 B1
+**Scope:** A `checkEntitlement(companyId, key)` vasszabály a CLAUDE.md-ben, de sehol sincs implementálva. Egy past_due tenant akadálytalanul hoz létre munkákat, foglalásokat, számlákat. Implementálni kell, és legalább a `createJob`, `createBooking`, `createInvoice` előtt meg kell hívni.
+**Fájlok:** `lib/entitlement/index.ts` (új), `lib/jobs/actions.ts`, `components/booking/actions.ts`, `lib/invoices/actions.ts`
+**Elfogadás:** `checkEntitlement` ellenőrzi `subscriptions.status != 'past_due'` és a plan-limiteket (szerelő-szám); past_due tenant `{ error: "Előfizetés lejárt" }` választ kap; feature-gate hibánál `{ error: "Limit elérve" }`.
+
+### T-85 ❌ [P0] Készletlevonás race condition javítása (UNIQUE constraint + RPC tranzakció) → T-36 👤 B1
+**Scope:** `saveSignature` az aláírás pillanatában `count(stock_movements) == 0` ellenőrzéssel dönt a levonásról. Két párhuzamos kérés (hálózati újraküldés, dupla kattintás) mindkettő 0-t lát és mindkettő levonja a készletet. A fix: `UNIQUE(worksheet_id, material_id)` constraint a `stock_movements` táblán + az összes levonás egyetlen Postgres tranzakción belül.
+**Fájlok:** `components/worksheet/worksheet-actions.ts`, `supabase/migrations/0035_stock_movements_unique.sql`
+**Elfogadás:** migration: `UNIQUE(worksheet_id, material_id)` on `stock_movements`; az aláírás-action egyetlen RPC-t hív ami az összes levonást tranzakcióban végzi; párhuzamos második hívás unique violation-nel sikertelen (nem von le kétszer).
+
+### T-86 ❌ [P0] Munkalap-sor törlésének zárolása aláírás után → T-43 👤 B1
+**Scope:** `deleteWorksheetLine` nem ellenőrzi, hogy az ügyfél már aláírta-e a munkalapot. Aláírás után törölt sor: a készlet már le van vonva (T-85), a számla a rövidebb listával készül, az aláírás-dokumentum és a számla eltér. Az ügyfél olyan dologhoz adta az aláírást, amit nem számláznak ki.
+**Fájlok:** `lib/worksheets/actions.ts`
+**Elfogadás:** ha `worksheets.customer_signed_at IS NOT NULL`, `deleteWorksheetLine` `{ error: "A munkalap már aláírva, törlés nem lehetséges." }` választ ad; UI-on a törlés gomb disabled.
+
+### T-87 ❌ [P1] Számlaütközés-kezelés: `kesz → szamlazva` guard → T-32 👤 B1
+**Scope:** A státuszgép engedi a `kesz → szamlazva` átmenetet, de nincs ellenőrzés, hogy létezik-e számla a jobhoz. Egy diszpécser jelölheti „Számlázva"-ra a munkát anélkül, hogy számlát állított volna ki.
+**Fájlok:** `lib/jobs/actions.ts`
+**Elfogadás:** `updateJobStatus` a `kesz → szamlazva` átmenetnél ellenőrzi, hogy `invoices` táblában van-e sor ehhez a job_id-hoz; ha nincs, `{ error: "Előbb állíts ki számlát." }` választ ad.
+
+### T-88 ❌ [P1] Job létrehozása után azonnali Foglalás CTA → T-22, T-40 👤 B1
+**Scope:** Az intake dialógus lezárása után a diszpécser a job Áttekintés oldalán landol, ahol nincs időpont. Nincs prominens CTA a foglaláshoz — a diszpécsernek fejből kell tudnia, hogy a Naptárba kell navigálni. Ha az `appointments` tömb üres, megjelenik egy „Időpontot foglal" gomb, ami megnyitja a `BookingDropup`-ot.
+**Fájlok:** `app/(app)/jobs/[id]/page.tsx`
+**Elfogadás:** ha `appointments.length === 0`, az Áttekintés tab tetején prominens „Időpontot foglal →" gomb jelenik meg; a gomb a `BookingDropup`-ot nyitja meg az adott job_id-val előtöltve.
+
+### T-89 ❌ [P1] Szolgáltatás-választó az intake 3. lépésében → T-12 👤 B1
+**Scope:** A `PhoneIntakeDialog` 3. lépéséből (munkacím + megjegyzés) hiányzik a szolgáltatás-választó. Az így létrehozott munka `service_id: null`-lal kerül a rendszerbe, a munkalista „Szolgáltatás" oszlopa üres marad.
+**Fájlok:** `components/intake/PhoneIntakeDialog.tsx`, `lib/crm/actions.ts`
+**Elfogadás:** a 3. lépésben egy `<Select>` lekérdezi a cég aktív szolgáltatásait; a kiválasztott `service_id` bekerül a `createJob` formData-ba; ha nem kötelező (üres maradhat), az is elfogadható.
+
+### T-90 ❌ [P1] Foglalás-kérés → munka egyklikkes konvertálása → T-61 👤 B1
+**Scope:** A `/requests` oldalon a diszpécser látja a beérkező ajánlatkéréseket, de nincs „Munka létrehozása" gomb ami egy lépésben létrehozza az ügyfelet + helyszínt + munkát a kérés adataiból és navigál az új munkára. T-61 az oldalt megcsinálja, de a konvertáló action hiányzik.
+**Fájlok:** `components/requests/RequestsClient.tsx`, `lib/requests/actions.ts` (új)
+**Elfogadás:** minden request sornál „Lezárás + munka létrehozása" gomb; ha az ügyfél nem létezik (phone alapján), létrehozza; `booking_requests.status → converted`, `job_id` kitöltve; navigál az új job oldalra.
+
+### T-91 ❌ [P1] Rate limiter: Upstash Redis a publikus foglalón → T-60 👤 B2
+**Scope:** Az `app/api/public/request/route.ts`-ban lévő rate limiter egy modul-szintű `Map`-et használ. Vercel-en minden invokáció új folyamatban fut — a `Map` nulláról indul, a rate limit hatástalan. Upstash Redis szükséges.
+**Fájlok:** `app/api/public/request/route.ts`
+**Elfogadás:** `@upstash/ratelimit` + `@upstash/redis` csomag; IP-alapú rate limit Upstash-sel; lokális fejlesztésben fallback (env var nélkül disabled).
+
+### T-92 ❌ [P1] DB-hiba megjelenítése a lista oldalakon (nem üres állapot) → T-22, T-10 👤 B1
+**Scope:** Ha a Supabase query hibát ad vissza, `data` null lesz és az `EmptyState` renderel („Nincs munka"). A felhasználó nem tudja, hogy adatlekérési hiba van — a hibaüzenet elnyelődik. Az `error` objektumot ellenőrizni kell és külön hibastátuszt kell mutatni.
+**Fájlok:** `app/(app)/jobs/page.tsx`, `app/(app)/customers/page.tsx`, `app/(app)/my-day/page.tsx`
+**Elfogadás:** ha `error && !data`, az oldalon „Adatok betöltése sikertelen — próbáld újra" üzenet jelenik meg (nem az üres állapot); a hiba logolódik szerver oldalon.
+
+### T-93 ❌ [P1] Job detail layout: dupla auth query megszüntetése → T-22 👤 B1
+**Scope:** `app/(app)/jobs/[id]/layout.tsx` manuálisan hív `getUser()` + `company_users` query-t a `getAuthContext()` megkerülésével. Minden job oldalletöltésnél 2 extra DB kérés fut.
+**Fájlok:** `app/(app)/jobs/[id]/layout.tsx`
+**Elfogadás:** layout `getAuthContext()` hívással működik; a kézi `getUser()` + `company_users` blokk eltávolítva.
+
+### T-94 ❌ [P1] Integráció-tesztek az intake folyamatra → T-81, T-82 👤 B1
+**Scope:** A `createQuickCustomer → createJob` kritikus útvonalnak nincs egyetlen tesztje sem. Regresszió esetén néma hiba lesz.
+**Fájlok:** `__tests__/intake.test.ts` (új)
+**Elfogadás:** (1) új ügyfél: ügyfél + helyszín + munka atomilag jön létre; (2) meglévő ügyfél: nem hoz létre újat; (3) site_id visszakerül a formData-ba; (4) helyszín-hiba esetén nincs orphan ügyfél.
+
+### T-95 ❌ [P2] Mindenki nézet: foglalás-létrehozás technikus előtöltéssel → T-40 👤 B1
+**Scope:** A Naptár „Mindenki" (all-techs) nézetben a stacked weekly kalenderek csak olvashatók — időpont-létrehozás, drag-drop nem elérhető. A diszpécser lát egy szabad sávot, de nem tud rá klikkelni; vissza kell váltania egyéni szerelő nézetre.
+**Fájlok:** `components/calendar/DispatchCalendar.tsx`
+**Elfogadás:** a Mindenki nézetben egy sávra kattintva a `BookingDropup` nyílik meg, a technikus mező előtöltve az adott sor szerelőjével; a foglalás létrehozása után az adott tech naptárában megjelenik az időpont.
+
+---
+
 # Phase 2 ticketek (moat) — részletes tervek
 
 > **Mikor indítható:** T-65 (pilot) után, legalább 3 pilot céggel, fizetőképes érdeklődéssel. A Phase 2 moat = recurring bevétel a tenantnak, GPS tracking, offline mobil.
@@ -333,6 +415,13 @@ T-01→02→03→04→05→06   (alap + auth + billing)  ✅
         ├ 50 app store ✅ → 51 UI ✅ · 52 naptár-sync ❌ · 53 értesítés [⚠️] · 54 értesítés-beállítás ✅
         └ 60 ajánlatkérő ✅ → 61 konverzió ✅ · 62 dashboard ✅ · 63 export ✅ · 64 cron ❌ → 65 audit+e2e ❌
 
+EPIC 7 — CEO Audit (Sprint 0 + A):
+  T-81 atomikus create → T-82 site_id return → T-83 company_id fix (1 sor)
+  T-84 entitlement impl → T-85 stock race → T-86 signed line lock
+  T-87 szamlazva guard → T-88 booking CTA → T-89 service picker → T-90 request konverzió
+  T-91 redis rate limit → T-92 DB error state → T-93 layout dupla auth → T-94 intake tesztek
+  T-95 mindenki nézet create [P2]
+
 Phase 2 (T-65 után):
   T-70 payment → 71 card-on-file → 72 tagság + 73 részletfizetés + 74 review
   T-75 ügyfélportál · T-76 batch invoicing
@@ -341,15 +430,16 @@ Phase 2 (T-65 után):
   T-80 smart dispatch aktiválás (T-24+T-25 befejezése)
 ```
 
-## Következő 3 sprint (MVP záráshoz)
+## Következő 4 sprint (MVP záráshoz)
 
 | Sprint | Fókusz | Ticketek | Becsült CC idő |
 |--------|--------|----------|----------------|
-| **Sprint A** | PDF letöltők + hó/térkép | T-35 UI, T-41 | ~3-4 óra |
-| **Sprint B** | Cron + dunning Edge Functions | T-64 | ~4-5 óra |
+| **Sprint 0** | CEO audit P0 kritikus javítások | T-81 (atomikus create), T-82 (site_id), T-83 (company_id), T-84 (entitlement), T-85 (stock race), T-86 (line lock) | ~4-5 óra |
+| **Sprint A** | CEO audit P1 + PDF + hó/térkép | T-87…94, T-35 UI, T-41 | ~6-7 óra |
+| **Sprint B** | Cron + dunning Edge Functions | T-64, T-95 (calendar) | ~4-5 óra |
 | **Sprint C** | RLS audit + Playwright e2e | T-65 | ~6-8 óra |
 
-**Pilot-ready dátum:** Sprint C után, ~15-20 CC-óra munkával.
+**Pilot-ready dátum:** Sprint C után, ~20-25 CC-óra munkával.
 
 ## Frissített mérföldkövek (v3.0)
 
