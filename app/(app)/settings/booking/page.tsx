@@ -24,8 +24,8 @@ export default async function BookingSettingsPage() {
   };
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="space-y-6">
+      <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Foglalás</h1>
         <p className="text-sm text-muted-foreground">Foglalási mód és munkaidő-sávok beállítása.</p>
       </div>

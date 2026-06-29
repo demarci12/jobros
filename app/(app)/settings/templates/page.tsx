@@ -20,7 +20,7 @@ export default async function TemplatesPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Job sablonok</h1>
         <p className="text-sm text-muted-foreground">
           Sablonokkal előre definiált ellenőrzőlistákat rendelhet a munkatípusokhoz.

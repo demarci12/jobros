@@ -17,7 +17,7 @@ export default async function CompanyPage() {
 
   return (
     <div className="space-y-6 max-w-lg">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Cégadatok</h1>
         <p className="text-sm text-muted-foreground mt-1">Számlázáshoz és nyilvános profilhoz.</p>
       </div>

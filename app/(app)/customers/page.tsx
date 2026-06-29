@@ -83,7 +83,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: { 
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      <div className="border-b pb-4 flex items-center justify-between gap-3">
         <h1 className="text-xl font-semibold">Ügyfelek</h1>
         <AddCustomerButton canEdit={canEdit} />
       </div>

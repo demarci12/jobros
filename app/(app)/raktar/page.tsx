@@ -26,7 +26,7 @@ export default async function RaktarPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Raktárkezelés</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Készletszintek, készletérték és mozgásnapló. Anyagokat a{" "}

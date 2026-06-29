@@ -42,12 +42,14 @@ export function ManualSlotPicker({
   technicians,
   workingHours,
   onSelect,
+  isPending = false,
 }: {
   durationMin: number;
   existingAppointments: Appointment[];
   technicians: Technician[];
   workingHours: WorkingHours;
   onSelect: (slot: Slot, technicianId: string | null) => void;
+  isPending?: boolean;
 }) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selectedTech, setSelectedTech] = useState<string | null>(technicians[0]?.id ?? null);
@@ -223,8 +225,10 @@ export function ManualSlotPicker({
             )}
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={() => setSelectedSlot(null)}>Törlés</Button>
-            <Button size="sm" onClick={() => onSelect(selectedSlot, selectedTech)}>Foglalás →</Button>
+            <Button variant="outline" size="sm" onClick={() => setSelectedSlot(null)} disabled={isPending}>Törlés</Button>
+            <Button size="sm" onClick={() => onSelect(selectedSlot, selectedTech)} disabled={isPending}>
+              {isPending ? "Foglalás…" : "Foglalás →"}
+            </Button>
           </div>
         </div>
       )}

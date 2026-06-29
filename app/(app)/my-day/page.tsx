@@ -39,7 +39,7 @@ export default async function MyDayPage() {
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Mai napom</h1>
         <p className="text-sm text-muted-foreground capitalize">{today}</p>
       </div>

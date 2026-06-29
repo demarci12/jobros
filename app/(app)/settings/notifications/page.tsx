@@ -40,7 +40,7 @@ export default async function NotificationsPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Értesítések</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Eseményenkénti ki/be kapcsoló, csatorna (SMS/email) és sablon.

@@ -23,7 +23,7 @@ export default async function RequestsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Beérkező ajánlatkérések</h1>
         <p className="text-sm text-muted-foreground">
           Publikus link:{" "}

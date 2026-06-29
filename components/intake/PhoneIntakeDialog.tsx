@@ -69,12 +69,14 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   // New customer form state
   const [ncName, setNcName] = useState("");
   const [ncPhone, setNcPhone] = useState("");
+  const [ncEmail, setNcEmail] = useState("");
   const [ncAddress, setNcAddress] = useState("");
   const [ncCity, setNcCity] = useState("");
 
   function openNewCustomer() {
     setNcName(query); // pre-fill with what was typed
     setNcPhone("");
+    setNcEmail("");
     setNcAddress("");
     setNcCity("");
     setStep("new-customer");
@@ -85,11 +87,12 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
       const fd = new FormData();
       fd.set("name", ncName);
       fd.set("phone", ncPhone);
+      fd.set("email", ncEmail);
       fd.set("address", ncAddress);
       fd.set("city", ncCity);
       const res = await createQuickCustomer(fd);
       if ("error" in res && res.error) { toast.error(res.error); return; }
-      const newCustomer: Customer = { id: (res as any).id, name: ncName, phone: ncPhone || null, email: null };
+      const newCustomer: Customer = { id: (res as any).id, name: ncName, phone: ncPhone || null, email: ncEmail || null };
       setSelectedCustomer(newCustomer);
       setCustomerId((res as any).id);
       setStep("job");
@@ -138,10 +141,37 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Phone size={16} className="text-muted-foreground" />
-              Telefon bevitel
+              <Phone size={16} className="text-primary" />
+              Hívás fogadása
             </DialogTitle>
           </DialogHeader>
+
+          {/* Step indicator */}
+          {(() => {
+            const steps = [
+              { id: "search", label: "Ügyfél" },
+              { id: "new-customer", label: "Adatok" },
+              { id: "job", label: "Munka" },
+            ] as const;
+            const currentIdx = step === "search" ? 0 : step === "new-customer" ? 1 : 2;
+            return (
+              <div className="flex items-center gap-0 pb-1">
+                {steps.map((s, i) => (
+                  <div key={s.id} className="flex items-center">
+                    {i > 0 && <div className={`h-px w-6 ${i <= currentIdx ? "bg-primary" : "bg-border"}`} />}
+                    <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${
+                      i === currentIdx ? "bg-primary text-primary-foreground" :
+                      i < currentIdx ? "bg-primary/15 text-primary" :
+                      "bg-muted text-muted-foreground"
+                    }`}>
+                      <span>{i + 1}.</span>
+                      <span>{s.label}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* ── Step 1: Search ── */}
           {step === "search" && (
@@ -201,35 +231,39 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
 
           {/* ── Step 2: New customer ── */}
           {step === "new-customer" && (
-            <div className="space-y-3">
+            <div className="space-y-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Név *</Label>
+                <Input value={ncName} onChange={e => setNcName(e.target.value)} placeholder="Kovács János" autoFocus />
+              </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs">Név *</Label>
-                  <Input value={ncName} onChange={e => setNcName(e.target.value)} placeholder="Kovács János" autoFocus />
-                </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Telefonszám</Label>
                   <Input value={ncPhone} onChange={e => setNcPhone(e.target.value)} placeholder="+36 30 000 0000" type="tel" />
                 </div>
-                <div className="col-span-2 space-y-1">
-                  <Label className="text-xs">Cím *</Label>
-                  <Input value={ncAddress} onChange={e => setNcAddress(e.target.value)} placeholder="Fő utca 1." />
-                </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Város</Label>
-                  <Input value={ncCity} onChange={e => setNcCity(e.target.value)} placeholder="Budapest" />
+                  <Label className="text-xs">E-mail</Label>
+                  <Input value={ncEmail} onChange={e => setNcEmail(e.target.value)} placeholder="nev@email.hu" type="email" />
                 </div>
               </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Cím *</Label>
+                <Input value={ncAddress} onChange={e => setNcAddress(e.target.value)} placeholder="Fő utca 1." />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Város</Label>
+                <Input value={ncCity} onChange={e => setNcCity(e.target.value)} placeholder="Budapest" />
+              </div>
               <div className="flex gap-2 pt-1">
-                <Button variant="ghost" size="sm" onClick={() => setStep("search")}>Vissza</Button>
+                <Button variant="ghost" size="sm" onClick={() => setStep("search")}>← Vissza</Button>
                 <Button
                   size="sm"
                   className="flex-1"
-                  disabled={!ncName || !ncAddress || isPending}
+                  disabled={!ncName.trim() || !ncAddress.trim() || isPending}
                   onClick={handleCreateCustomer}
                 >
                   {isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                  Ügyfél létrehozása
+                  Ügyfél létrehozása →
                 </Button>
               </div>
             </div>

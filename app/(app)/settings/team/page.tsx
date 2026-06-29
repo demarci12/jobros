@@ -17,7 +17,7 @@ export default async function TeamPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Csapat</h1>
         <p className="text-sm text-muted-foreground mt-1">Tagok, szerepkörök és meghívók kezelése.</p>
       </div>

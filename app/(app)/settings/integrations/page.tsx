@@ -33,7 +33,7 @@ export default async function IntegrationsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Integrációk</h1>
         <p className="text-sm text-muted-foreground">Számlázó, naptár, üzenetküldő és fizetési csatlakozók telepítése.</p>
       </div>

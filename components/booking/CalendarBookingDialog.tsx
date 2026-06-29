@@ -281,6 +281,7 @@ export function CalendarBookingDialog({
               technicians={technicians}
               workingHours={workingHours}
               onSelect={handleSlotSelect}
+              isPending={isPending}
             />
             {isPending && (
               <p className="text-sm text-muted-foreground text-center">Foglalás létrehozása…</p>

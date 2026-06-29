@@ -27,8 +27,8 @@ export default async function ZonesPage() {
   const canEdit = ["owner", "dispatcher"].includes(role);
 
   return (
-    <div className="space-y-4">
-      <div>
+    <div className="space-y-6">
+      <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Szervizzónák</h1>
         <p className="text-sm text-muted-foreground">Szerelőnként bázispont és kiszállási radius.</p>
       </div>

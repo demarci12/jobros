@@ -26,7 +26,7 @@ export default async function BillingListPage() {
 
   return (
     <div className="space-y-6">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Számlák</h1>
         <p className="text-sm text-muted-foreground">
           Csak olvasó számla-lista könyvelési és NAV-ellenőrzési célra.

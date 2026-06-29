@@ -15,7 +15,7 @@ export default async function ServicesPage() {
 
   return (
     <div className="space-y-6 max-w-2xl">
-      <div>
+      <div className="border-b pb-4">
         <h1 className="text-xl font-semibold">Szolgáltatások</h1>
         <p className="text-sm text-muted-foreground mt-1">A foglaláskor választható tevékenységek és árak.</p>
       </div>
