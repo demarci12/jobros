@@ -23,7 +23,6 @@ type Line = {
 type Worksheet = {
   id: string | null;
   work_done: string | null;
-  labor_hours: number | null;
   lines: Line[];
 };
 
@@ -50,7 +49,6 @@ export function WorksheetClient({
 }) {
   const [isPending, startTransition] = useTransition();
   const [workDone, setWorkDone] = useState(worksheet.work_done ?? "");
-  const [laborHours, setLaborHours] = useState(worksheet.labor_hours?.toString() ?? "");
   const [worksheetId, setWorksheetId] = useState(worksheet.id);
   const [lines, setLines] = useState<Line[]>(worksheet.lines);
 
@@ -65,7 +63,6 @@ export function WorksheetClient({
     startTransition(async () => {
       const fd = new FormData();
       fd.set("work_done", workDone);
-      if (laborHours) fd.set("labor_hours", laborHours);
       const result = await upsertWorksheet(jobId, fd);
       if (result?.error) toast.error(result.error);
       else {
@@ -124,10 +121,6 @@ export function WorksheetClient({
           className="resize-none"
         />
         <div className="flex items-center gap-3">
-          <Label className="text-sm whitespace-nowrap">Munkaidő (óra)</Label>
-          <Input type="number" min={0} step={0.5} value={laborHours}
-            onChange={e => setLaborHours(e.target.value)}
-            disabled={!canEdit} className="w-24 h-8" />
           {canEdit && (
             <Button size="sm" variant="outline" disabled={isPending} onClick={handleSaveWorksheet}>
               Mentés

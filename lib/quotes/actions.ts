@@ -64,6 +64,7 @@ export async function addQuoteLine(quoteId: string, jobId: string, formData: For
   const ctx = await getDispatchCtx();
   if (!ctx) return { error: "Nincs jogosultság." };
 
+  const rawMaterialId = formData.get("material_id");
   const parsed = lineSchema.safeParse({
     description: formData.get("description"),
     quantity: formData.get("quantity"),
@@ -76,12 +77,15 @@ export async function addQuoteLine(quoteId: string, jobId: string, formData: For
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
+  const materialId = rawMaterialId && typeof rawMaterialId === "string" ? rawMaterialId : null;
+
   const { data, error } = await ctx.supabase.from("quote_lines").insert({
     company_id: ctx.companyId,
     quote_id: quoteId,
     ...parsed.data,
     option_group: parsed.data.option_group || null,
-  }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_optional, option_group, is_selected").single();
+    ...(materialId ? { material_id: materialId } : {}),
+  }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_optional, option_group, is_selected, material_id").single();
 
   if (error) return { error: error.message };
   revalidatePath(`/jobs/${jobId}/quote`);
@@ -113,9 +117,41 @@ export async function updateQuoteStatus(quoteId: string, status: string, jobId: 
   if (!ctx) return { error: "Nincs jogosultság." };
   const validStatus = z.enum(["draft", "sent", "accepted", "rejected"]).safeParse(status);
   if (!validStatus.success) return { error: "Érvénytelen státusz." };
+
+  const { data: currentQuote } = await ctx.supabase.from("quotes")
+    .select("status").eq("id", quoteId).eq("company_id", ctx.companyId).maybeSingle();
+  if (!currentQuote) return { error: "Árajánlat nem található." };
+
   const { error } = await ctx.supabase.from("quotes")
     .update({ status: validStatus.data }).eq("id", quoteId).eq("company_id", ctx.companyId);
   if (error) return { error: error.message };
+
+  // Stock reservation management: sent → reserve, rejected/accepted → release.
+  // Only act when crossing the relevant boundary.
+  const newStatus = validStatus.data;
+  const oldStatus = currentQuote.status as string;
+  const shouldReserve = newStatus === "sent" && oldStatus !== "sent";
+  const shouldRelease = (newStatus === "rejected" || newStatus === "accepted") && oldStatus === "sent";
+
+  if (shouldReserve || shouldRelease) {
+    const { data: lines } = await ctx.supabase
+      .from("quote_lines")
+      .select("material_id, quantity")
+      .eq("quote_id", quoteId)
+      .eq("company_id", ctx.companyId)
+      .eq("is_selected", true)
+      .not("material_id", "is", null);
+
+    for (const line of lines ?? []) {
+      if (!line.material_id || line.quantity <= 0) continue;
+      const delta = shouldReserve ? line.quantity : -line.quantity;
+      await ctx.supabase.rpc("increment_reserved", {
+        p_material_id: line.material_id,
+        p_delta: delta,
+      });
+    }
+  }
+
   revalidatePath(`/jobs/${jobId}/quote`);
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");

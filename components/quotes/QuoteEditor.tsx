@@ -52,6 +52,7 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
   const [newLine, setNewLine] = useState({
     description: "", quantity: "1", unit: "db",
     unit_price: "0", vat_rate: "27", is_optional: false, option_group: "",
+    material_id: "",
   });
 
   function handleCreateQuote() {
@@ -76,7 +77,7 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
         toast.error(result.error);
       } else if ("line" in result && result.line) {
         setQuote(q => q ? { ...q, lines: [...q.lines, result.line as QuoteLine] } : q);
-        setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_optional: false, option_group: "" });
+        setNewLine({ description: "", quantity: "1", unit: "db", unit_price: "0", vat_rate: "27", is_optional: false, option_group: "", material_id: "" });
         toast.success("Tétel hozzáadva.");
       }
     });
@@ -151,6 +152,7 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
       unit: m.unit,
       unit_price: String(m.unit_price),
       vat_rate: String(m.vat_rate),
+      material_id: m.id,
     }));
     setMaterialQuery("");
     setMaterialResults([]);

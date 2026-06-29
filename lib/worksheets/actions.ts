@@ -9,7 +9,6 @@ async function getWorksheetCtx(jobId: string) {
   if (!ctx) return null;
   const { supabase, companyId } = ctx;
 
-  // verify job access
   const { data: job } = await supabase
     .from("jobs").select("id, assigned_to")
     .eq("id", jobId).eq("company_id", companyId).maybeSingle();
@@ -24,9 +23,7 @@ export async function upsertWorksheet(jobId: string, formData: FormData) {
   if (!ctx?.canWrite) return { error: "Nincs jogosultság." };
 
   const workDone = formData.get("work_done") as string | null;
-  const laborHours = formData.get("labor_hours") ? Number(formData.get("labor_hours")) : null;
 
-  // upsert: one worksheet per job
   const { data: existing } = await ctx.supabase
     .from("worksheets").select("id")
     .eq("job_id", jobId).eq("company_id", ctx.companyId).maybeSingle();
@@ -34,13 +31,13 @@ export async function upsertWorksheet(jobId: string, formData: FormData) {
   let worksheetId: string;
   if (existing) {
     const { error } = await ctx.supabase.from("worksheets")
-      .update({ work_done: workDone, labor_hours: laborHours })
+      .update({ work_done: workDone })
       .eq("id", existing.id);
     if (error) return { error: error.message };
     worksheetId = existing.id;
   } else {
     const { data, error } = await ctx.supabase.from("worksheets")
-      .insert({ company_id: ctx.companyId, job_id: jobId, work_done: workDone, labor_hours: laborHours, technician_id: ctx.userId })
+      .insert({ company_id: ctx.companyId, job_id: jobId, work_done: workDone, technician_id: ctx.userId })
       .select("id").single();
     if (error) return { error: error.message };
     worksheetId = data.id;
@@ -86,31 +83,7 @@ export async function addWorksheetLine(worksheetId: string, jobId: string, formD
   }).select("id, description, quantity, unit, unit_price, vat_rate, line_total, is_labor").single();
   if (error) return { error: error.message };
 
-  // Atomic stock deduction when material is linked
-  if (material_id && lineData.quantity > 0) {
-    // Verify material belongs to this company
-    const { data: mat } = await ctx.supabase
-      .from("materials").select("id")
-      .eq("id", material_id).eq("company_id", ctx.companyId).maybeSingle();
-    if (mat) {
-      const { error: rpcError } = await ctx.supabase.rpc("increment_stock", {
-        p_material_id: material_id,
-        p_delta: -lineData.quantity,
-      });
-      if (rpcError) return { error: `Készlet-csökkentés sikertelen: ${rpcError.message}`, line: insertedLine };
-
-      const { error: movErr } = await ctx.supabase.from("stock_movements").insert({
-        company_id: ctx.companyId,
-        material_id,
-        worksheet_id: worksheetId,
-        job_id: jobId,
-        quantity: -lineData.quantity,
-        reason: "Munkalap tétel hozzáadás",
-        created_by: ctx.userId,
-      });
-      if (movErr) return { error: `Készlet-mozgás rögzítése sikertelen: ${movErr.message}`, line: insertedLine };
-    }
-  }
+  // Stock is NOT deducted here — it is deducted atomically at signature time.
 
   revalidatePath(`/jobs/${jobId}/worksheet`);
   return { line: insertedLine };
