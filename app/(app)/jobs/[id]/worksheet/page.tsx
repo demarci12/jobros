@@ -27,6 +27,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     { data: catalogMaterials },
     { data: checklistItems },
     { data: checklistTemplates },
+    { data: worksheetTemplates },
   ] = await Promise.all([
     supabase.from("worksheets").select("id, work_done")
       .eq("job_id", params.id).eq("company_id", companyId).maybeSingle(),
@@ -43,6 +44,12 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     supabase.from("job_templates")
       .select("id, name")
       .eq("company_id", companyId)
+      .eq("template_kind", "checklist")
+      .order("name"),
+    supabase.from("job_templates")
+      .select("id, name")
+      .eq("company_id", companyId)
+      .eq("template_kind", "worksheet")
       .order("name"),
   ]);
 
@@ -74,6 +81,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
         }}
         canEdit={canEdit}
         catalogMaterials={(catalogMaterials ?? []) as any}
+        worksheetTemplates={(worksheetTemplates ?? []) as any}
       />
 
       {/* Ellenőrzőlista */}

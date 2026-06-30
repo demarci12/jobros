@@ -12,14 +12,22 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
     .eq("id", params.id).eq("company_id", companyId).maybeSingle();
   if (!job) notFound();
 
-  const { data: quote } = await supabase
-    .from("quotes")
-    .select("id, quote_number, status, valid_until, notes")
-    .eq("job_id", params.id)
-    .eq("company_id", companyId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: quote }, { data: quoteTemplates }] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id, quote_number, status, valid_until, notes")
+      .eq("job_id", params.id)
+      .eq("company_id", companyId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("job_templates")
+      .select("id, name, default_lines")
+      .eq("company_id", companyId)
+      .eq("template_kind", "quote")
+      .order("name"),
+  ]);
 
   const { data: lines } = quote
     ? await supabase
@@ -36,6 +44,7 @@ export default async function QuotePage({ params }: { params: { id: string } }) 
       jobId={params.id}
       initialQuote={quote ? { ...quote, lines: (lines ?? []) as any } : null}
       canEdit={canEdit}
+      quoteTemplates={(quoteTemplates ?? []) as any}
     />
   );
 }

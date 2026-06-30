@@ -4,15 +4,17 @@ import { useState, useTransition, useRef } from "react";
 import {
   createQuote, addQuoteLine, toggleLineSelected, deleteQuoteLine, updateQuoteStatus,
 } from "@/lib/quotes/actions";
+import { applyQuoteTemplate } from "@/lib/templates/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, Plus, Send, CheckCircle, XCircle, Download, Package } from "lucide-react";
+import { Trash2, Plus, Send, CheckCircle, XCircle, Download, Package, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 
 type Material = { id: string; name: string; unit: string; unit_price: number; vat_rate: number; stock_qty: number };
+type QuoteTemplate = { id: string; name: string; default_lines: unknown };
 
 type QuoteLine = {
   id: string;
@@ -41,7 +43,7 @@ const STATUS_LABELS: Record<string, string> = { draft: "Vázlat", sent: "Elküld
 const STATUS_COLORS: Record<string, string> = { draft: "bg-gray-100 text-gray-700", sent: "bg-blue-100 text-blue-700", accepted: "bg-green-100 text-green-700", rejected: "bg-red-100 text-red-700" };
 const VAT_OPTIONS = [0, 5, 18, 27];
 
-export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: string; initialQuote: Quote | null; canEdit?: boolean }) {
+export function QuoteEditor({ jobId, initialQuote, canEdit = true, quoteTemplates = [] }: { jobId: string; initialQuote: Quote | null; canEdit?: boolean; quoteTemplates?: QuoteTemplate[] }) {
   const [isPending, startTransition] = useTransition();
   const [quote, setQuote] = useState<Quote | null>(initialQuote);
   const [materialQuery, setMaterialQuery] = useState("");
@@ -49,6 +51,7 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
   const [materialSearching, setMaterialSearching] = useState(false);
   const [showMaterialPicker, setShowMaterialPicker] = useState(false);
   const matTimer = useRef<ReturnType<typeof setTimeout>>();
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
   const [newLine, setNewLine] = useState({
     description: "", quantity: "1", unit: "db",
     unit_price: "0", vat_rate: "27", is_optional: false, option_group: "",
@@ -190,7 +193,36 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true }: { jobId: st
           </Badge>
         </div>
         {canEdit && (
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            {quoteTemplates.length > 0 && quote.status === "draft" && (
+              <div className="relative">
+                <Button size="sm" variant="outline" className="gap-1"
+                  onClick={() => setShowTemplatePicker(v => !v)}>
+                  <LayoutTemplate size={13} /> Sablon betöltése
+                </Button>
+                {showTemplatePicker && (
+                  <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-md border bg-background shadow-md">
+                    {quoteTemplates.map(tmpl => (
+                      <button
+                        key={tmpl.id}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50"
+                        onClick={() => {
+                          setShowTemplatePicker(false);
+                          startTransition(async () => {
+                            const res = await applyQuoteTemplate(quote.id, tmpl.id);
+                            if (res?.error) toast.error(res.error);
+                            else { toast.success("Sablon betöltve."); window.location.reload(); }
+                          });
+                        }}
+                      >
+                        {tmpl.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <a href={`/api/pdf/quote/${quote.id}`} target="_blank" rel="noopener noreferrer">
               <Button size="sm" variant="outline" className="gap-1">
                 <Download size={13} /> PDF

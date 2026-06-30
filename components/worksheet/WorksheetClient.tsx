@@ -2,11 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { upsertWorksheet, addWorksheetLine, deleteWorksheetLine } from "@/lib/worksheets/actions";
+import { applyWorksheetTemplate } from "@/lib/templates/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Trash2, Plus, Download } from "lucide-react";
+import { Trash2, Plus, Download, LayoutTemplate } from "lucide-react";
 import { toast } from "sonner";
 
 type Line = {
@@ -34,6 +35,8 @@ export type CatalogMaterial = {
   vat_rate: number;
 };
 
+type WorksheetTemplate = { id: string; name: string };
+
 const VAT_OPTIONS = [0, 5, 18, 27];
 
 export function WorksheetClient({
@@ -41,16 +44,19 @@ export function WorksheetClient({
   worksheet,
   canEdit,
   catalogMaterials = [],
+  worksheetTemplates = [],
 }: {
   jobId: string;
   worksheet: Worksheet;
   canEdit: boolean;
   catalogMaterials?: CatalogMaterial[];
+  worksheetTemplates?: WorksheetTemplate[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [workDone, setWorkDone] = useState(worksheet.work_done ?? "");
   const [worksheetId, setWorksheetId] = useState(worksheet.id);
   const [lines, setLines] = useState<Line[]>(worksheet.lines);
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false);
 
   // New line form state
   const [newLine, setNewLine] = useState({
@@ -138,7 +144,42 @@ export function WorksheetClient({
 
       {/* Tételek */}
       <div className="space-y-2">
-        <h2 className="font-semibold text-sm">Tételek</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-semibold text-sm">Tételek</h2>
+          {canEdit && worksheetTemplates.length > 0 && worksheetId && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTemplatePicker(v => !v)}
+                className="flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <LayoutTemplate size={12} /> Sablon betöltése
+              </button>
+              {showTemplatePicker && (
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] rounded-md border bg-background shadow-md">
+                  {worksheetTemplates.map(tmpl => (
+                    <button
+                      key={tmpl.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50"
+                      onClick={() => {
+                        setShowTemplatePicker(false);
+                        if (!worksheetId) { toast.error("Előbb mentsd a munkalapot!"); return; }
+                        startTransition(async () => {
+                          const res = await applyWorksheetTemplate(worksheetId, tmpl.id);
+                          if (res?.error) toast.error(res.error);
+                          else { toast.success("Sablon betöltve."); window.location.reload(); }
+                        });
+                      }}
+                    >
+                      {tmpl.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {lines.length > 0 && (
           <div className="rounded-lg border overflow-x-auto">

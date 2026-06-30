@@ -11,7 +11,7 @@ export default async function TemplatesPage() {
 
   const [{ data: templates }, { data: enums }] = await Promise.all([
     supabase.from("job_templates")
-      .select("id, name, activity, checklist_items(id, label, sort_order, is_required)")
+      .select("id, name, activity, template_kind, default_lines, checklist_items(id, label, sort_order, is_required)")
       .eq("company_id", companyId)
       .order("name"),
     // activity enum values derived from the rendszerterv — static list
@@ -23,7 +23,7 @@ export default async function TemplatesPage() {
       <div className="border-b pb-4">
         <h1 className="text-lg font-semibold">Job sablonok</h1>
         <p className="text-sm text-muted-foreground">
-          Sablonokkal előre definiált ellenőrzőlistákat rendelhet a munkatípusokhoz.
+          Sablonokkal előre definiált ellenőrzőlistákat, árajánlat- és munkalap-sorokat rendelhet a munkatípusokhoz.
         </p>
       </div>
       <TemplatesClient
