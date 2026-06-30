@@ -65,7 +65,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       p_title: title,
       p_assigned_to: technicianId ?? null,
       p_created_by: user.id,
-      p_status: kind === 'felmeres' ? 'felmeres' : 'utemezve',
+      p_status: kind === 'felmeres' ? 'felmeres' : 'tervezett',
       p_kind: kind,
       p_starts_at: startsAt,
       p_ends_at: endsAt,
@@ -129,7 +129,7 @@ export async function addAppointmentToJob(input: z.infer<typeof AddAppointmentSc
     technician_id: technicianId ?? null,
     starts_at: startsAt,
     ends_at: endsAt,
-    status: "utemezve",
+    status: "tervezett",
   });
 
   if (error) return { error: error.message };
