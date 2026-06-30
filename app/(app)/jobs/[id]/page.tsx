@@ -5,6 +5,17 @@ import { Badge } from "@/components/ui/badge";
 import { User, MapPin, Wrench, Calendar } from "lucide-react";
 import { type JobStatus } from "@/lib/jobs/status-machine";
 import { EquipmentSelector } from "@/components/jobs/EquipmentSelector";
+import { JobBookingButton } from "@/components/jobs/JobBookingButton";
+
+const defaultHours = {
+  mon: { open: true,  start: "08:00", end: "17:00" },
+  tue: { open: true,  start: "08:00", end: "17:00" },
+  wed: { open: true,  start: "08:00", end: "17:00" },
+  thu: { open: true,  start: "08:00", end: "17:00" },
+  fri: { open: true,  start: "08:00", end: "17:00" },
+  sat: { open: false, start: "08:00", end: "13:00" },
+  sun: { open: false, start: "08:00", end: "13:00" },
+};
 
 export default async function JobOverviewPage({ params }: { params: { id: string } }) {
   const ctx = await getAuthContext();
@@ -26,19 +37,28 @@ export default async function JobOverviewPage({ params }: { params: { id: string
 
   const canEdit = ["owner", "dispatcher"].includes(role);
 
-  const { data: appointments } = await supabase
-    .from("appointments")
-    .select("id, kind, starts_at, ends_at, status")
-    .eq("job_id", params.id)
-    .neq("status", "lemondva")
-    .order("starts_at");
+  const in90Days = new Date(Date.now() + 90 * 86400_000).toISOString();
 
-  const { data: equipment } = await supabase
-    .from("equipment")
-    .select("id, manufacturer, model, kind, serial_number, next_service_due")
-    .eq("site_id", (job as any).sites?.id ?? "")
-    .is("deleted_at", null)
-    .order("manufacturer");
+  const [{ data: appointments }, { data: equipment }, { data: technicians }, { data: company }, { data: upcomingAppts }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("id, kind, starts_at, ends_at, status")
+      .eq("job_id", params.id)
+      .neq("status", "lemondva")
+      .order("starts_at"),
+    supabase
+      .from("equipment")
+      .select("id, manufacturer, model, kind, serial_number, next_service_due")
+      .eq("site_id", (job as any).sites?.id ?? "")
+      .is("deleted_at", null)
+      .order("manufacturer"),
+    supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", companyId).eq("role", "technician").eq("is_active", true),
+    supabase.from("companies").select("booking_mode, default_slot_duration_min, working_hours").eq("id", companyId).single(),
+    supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", companyId).gte("starts_at", new Date().toISOString()).lte("starts_at", in90Days).neq("status", "lemondva"),
+  ]);
+
+  const techList = (technicians ?? []).map((t: any) => ({ id: t.profiles?.id ?? t.user_id, name: t.profiles?.full_name ?? "Szerelő" }));
+  const hasAppointments = (appointments ?? []).length > 0;
 
   return (
     <div className="space-y-5 max-w-lg">
@@ -93,9 +113,22 @@ export default async function JobOverviewPage({ params }: { params: { id: string
       </div>
 
       {/* Időpontok */}
-      {(appointments ?? []).length > 0 ? (
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Időpontok</h2>
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Időpontok</h2>
+          {canEdit && (
+            <JobBookingButton
+              jobId={params.id}
+              technicians={techList}
+              existingAppointments={(upcomingAppts ?? []) as any}
+              defaultSlotDurationMin={company?.default_slot_duration_min ?? 120}
+              workingHours={(company?.working_hours as typeof defaultHours) ?? defaultHours}
+              hasAppointments={hasAppointments}
+            />
+          )}
+        </div>
+
+        {hasAppointments ? (
           <ul className="space-y-1">
             {(appointments ?? []).map((a: any) => (
               <li key={a.id} className="flex items-center gap-3 text-sm border rounded-md px-3 py-2">
@@ -108,15 +141,10 @@ export default async function JobOverviewPage({ params }: { params: { id: string
               </li>
             ))}
           </ul>
-        </div>
-      ) : canEdit && (
-        <div className="rounded-lg border border-dashed p-4 text-center space-y-2">
+        ) : (
           <p className="text-sm text-muted-foreground">Nincs ütemezett időpont ehhez a munkához.</p>
-          <Link href="/calendar" className="text-sm font-medium text-primary hover:underline">
-            Időpontot foglal a naptárban →
-          </Link>
-        </div>
-      )}
+        )}
+      </div>
 
     </div>
   );

@@ -92,6 +92,52 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
   return { jobId: job!.id };
 }
 
+const AddAppointmentSchema = z.object({
+  jobId: z.string().uuid(),
+  kind: z.enum(["munka", "felmeres"]),
+  technicianId: z.string().uuid().nullable(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+});
+
+export async function addAppointmentToJob(input: z.infer<typeof AddAppointmentSchema>) {
+  const parsed = AddAppointmentSchema.safeParse(input);
+  if (!parsed.success) return { error: "Érvénytelen adatok." };
+  const { jobId, kind, technicianId, startsAt, endsAt } = parsed.data;
+
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
+
+  const { supabase, companyId } = ctx;
+
+  // Verify job belongs to company
+  const { data: job } = await supabase.from("jobs").select("id").eq("id", jobId).eq("company_id", companyId).maybeSingle();
+  if (!job) return { error: "A munka nem található." };
+
+  // Conflict check
+  if (technicianId) {
+    const { data: conflict } = await supabase.from("appointments").select("id")
+      .eq("company_id", companyId).eq("technician_id", technicianId)
+      .neq("status", "lemondva").lt("starts_at", endsAt).gt("ends_at", startsAt).limit(1);
+    if ((conflict?.length ?? 0) > 0) return { error: "Ütközés: a szerelőnek már van foglalása ebben az időszakban." };
+  }
+
+  const { error } = await supabase.from("appointments").insert({
+    company_id: companyId,
+    job_id: jobId,
+    kind,
+    technician_id: technicianId ?? null,
+    starts_at: startsAt,
+    ends_at: endsAt,
+    status: "utemezve",
+  });
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/jobs/${jobId}`);
+  return { success: true };
+}
+
 // Keresés az ügyfél-választóhoz (naptárból indított foglaláskor)
 export async function searchCustomers(query: string) {
   const ctx = await getAuthContext();

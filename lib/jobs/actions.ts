@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { assertTransition, type JobStatus } from "./status-machine";
 import { checkEntitlement } from "@/lib/billing/entitlements";
+import { generateJobNumber } from "./job-number";
 
 async function getJobCtx(roles = ["owner", "dispatcher", "technician"] as string[]) {
   const ctx = await getAuthContext();
@@ -42,7 +43,7 @@ export async function createJob(formData: FormData) {
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
-  const jobNumber = await generateJobNumber(ctx.companyId, ctx.supabase);
+  const jobNumber = await generateJobNumber(ctx.supabase, ctx.companyId);
 
   const { data, error } = await ctx.supabase.from("jobs").insert({
     company_id: ctx.companyId,
@@ -56,17 +57,6 @@ export async function createJob(formData: FormData) {
   revalidatePath("/dashboard");
   revalidatePath(`/customers/${parsed.data.customer_id}`);
   return { id: data.id };
-}
-
-async function generateJobNumber(companyId: string, supabase: ReturnType<typeof createClient>) {
-  const year = new Date().getFullYear().toString();
-  const { count } = await supabase
-    .from("jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("company_id", companyId)
-    .like("job_number", `${year}-%`);
-  const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
-  return `${year}-${seq}`;
 }
 
 export async function updateJob(jobId: string, formData: FormData) {

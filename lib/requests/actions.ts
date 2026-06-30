@@ -3,6 +3,7 @@
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { getAuthContext } from "@/lib/supabase/auth-context";
+import { generateJobNumber } from "@/lib/jobs/job-number";
 
 async function getDispatcher() {
   const ctx = await getAuthContext();
@@ -78,14 +79,7 @@ export async function convertRequestToJob(raw: unknown) {
     }
   }
 
-  // Generate job number
-  const year = new Date().getFullYear().toString();
-  const { count } = await supabase.from("jobs")
-    .select("id", { count: "exact", head: true })
-    .eq("company_id", cu.company_id)
-    .like("job_number", `${year}-%`);
-  const seq = ((count ?? 0) + 1).toString().padStart(4, "0");
-  const jobNumber = `${year}-${seq}`;
+  const jobNumber = await generateJobNumber(supabase, cu.company_id);
 
   const { data: job, error: je } = await supabase.from("jobs").insert({
     company_id: cu.company_id,

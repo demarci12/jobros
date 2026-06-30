@@ -44,14 +44,22 @@ export class BillingoProvider implements InvoicingProvider {
       },
     };
 
-    const res = await fetch(`${BILLINGO_API}/documents`, {
-      method: "POST",
-      headers: {
-        "X-API-KEY": this.apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
-    });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    let res: Response;
+    try {
+      res = await fetch(`${BILLINGO_API}/documents`, {
+        method: "POST",
+        headers: {
+          "X-API-KEY": this.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
 
     if (!res.ok) {
       const err = await res.text();

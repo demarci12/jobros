@@ -21,9 +21,10 @@ A rendszerterv (v2.0) lebontva **Claude Code-méretű, sorba rendezett ticketekr
 | EPIC 4 — Naptár + Szerelő | ✅ T-40, T-42…45 | — | T-41 hó/térkép nézet |
 | EPIC 5 — App Store | ✅ T-50, T-51, T-54 | T-53 cron trigger | T-52 Google Calendar connector |
 | EPIC 6 — Dashboard + Export | ✅ T-60…63 | — | T-64 Edge Functions, T-65 audit+e2e |
-| EPIC 7 — CEO Audit Fixes | — | — | T-81…95 (15 ticket, CEO review 2026-06-29) |
+| EPIC 7 — CEO Audit Fixes | ✅ T-81…95 | — | — |
+| EPIC 8 — CEO Review #2 (2026-06-29) | — | — | T-96…T-107 (12 ticket) |
 
-**Összesített MVP-haladás: ~80% kész.** Blokkoló hiányok: T-81…87 (P0 kritikus), T-64 (dunning cron), T-65 (audit+pilot).
+**Összesített MVP-haladás: ~85% kész.** Blokkoló hiányok: T-96 (P0 RPC security), T-97 (next_service trigger), T-98 (Billingo timeout), T-64 (dunning cron), T-65 (audit+pilot).
 
 ---
 
@@ -337,7 +338,80 @@ A rendszerterv (v2.0) lebontva **Claude Code-méretű, sorba rendezett ticketekr
 
 ---
 
-# Phase 2 ticketek (moat) — részletes tervek
+# EPIC 8 — CEO Review #2 (2026-06-29)
+
+> CEO audit második körének 12 ticketje. Sprint 0′ (P0 security) + Sprint A′ (UX + ops).
+> **Elfogadott scope:** P0 RPC biztonsági javítás, 7 UX bővítés (E1–E7), cron observability, DRY refactor, izolációs teszt, Billingo timeout.
+
+### T-96 ❌ [P0] RPC tenant izolációs javítás → T-81…T-83 👤 B1
+**Scope:** A `create_customer_with_site`, `create_job_with_appointment` és `deduct_worksheet_stock` SECURITY DEFINER függvények elfogadnak `p_company_id` paramétert, de nem ellenőrzik, hogy `auth.uid()` valóban tagja-e annak a cégnek. Bármely hitelesített felhasználó idegen tenant adatait módosíthatja.
+**Fájlok:** `supabase/migrations/0037_rpc_tenant_auth.sql`
+**Elfogadás:** `create_customer_with_site` hívása idegen `company_id`-val `'Nincs jogosultság'` hibát ad; mindhárom függvényben `company_users WHERE user_id = auth.uid() AND company_id = p_company_id AND is_active = true` ellenőrzés fut; `deduct_worksheet_stock` a worksheet company_id-ját is validálja.
+
+### T-97 ❌ [P0] bump_next_service trigger hatókör-javítása → T-11 👤 B1
+**Scope:** A `bump_next_service` trigger egy job lezárásakor a helyszín **összes** berendezésének `next_service_due` mezőjét frissíti, nem csak a jobhoz rendelt eszközét. Ez hamis dátumokat ad a T-103 (next-service nudge) CTA-nak és a karbantartási előzményeknek.
+**Fájlok:** `supabase/migrations/0037_rpc_tenant_auth.sql` (vagy külön 0038)
+**Elfogadás:** trigger csak `WHERE equipment.id = NEW.equipment_id` sort frissíti; ha a jobnak nincs equipment_id-ja, trigger nem fut; unit teszt ellenőrzi, hogy a helyszín másik berendezésén nem változik a dátum.
+
+### T-98 ❌ [P1] Billingo API timeout guard → T-31 👤 B1
+**Scope:** Az `/api/jobs/[id]/invoice` route Billingo + NAV relay hívása timeout nélkül fut. Vercel EU-n a platform 60 másodpercnél törli a funkciót; Billingo/NAV csúcsidőn 10–30 másodpercet is kérhet. Ha a hívás lefagy, a felhasználó üres képernyőt lát és nem tudja, mi történt.
+**Fájlok:** `app/api/jobs/[id]/invoice/route.ts`
+**Elfogadás:** `Promise.race([provider.issueInvoice(...), 15s AbortController rejection])`; timeout esetén 504-es válasz `'A számlázó nem válaszolt — próbáld újra.'` szöveggel; idempotency key miatt az újrapróbálás biztonságos.
+
+### T-99 ❌ [P1] E1: Duplikált telefonszám-detekció az intake dialogban → T-12, T-81 👤 Te+B1
+**Scope:** Új ügyfél létrehozásakor nincs ellenőrzés, hogy a telefonszám már szerepel-e a rendszerben (pl. „0630 123 4567" vs „+36 30 123 4567"). Ez szellemrekordokat teremt — ugyanaz az ügyfél két profillal.
+**Fájlok:** `components/intake/PhoneIntakeDialog.tsx`, `lib/crm/actions.ts`
+**Elfogadás:** a telefonszám mezőbe gépelés után 300 ms debounce-szal ILIKE keresés fut a meglévő ügyfelekben; ha találat van, sárga figyelmeztető kártya jelenik meg: „Úgy tűnik, ez az ügyfél már szerepel: [Név] — Kiválasztod?" gombbal; az ügyfél kiválasztható a találatból, vagy tudatosan új profil hozható létre.
+
+### T-100 ❌ [P1] E2: Job státusz-timeline UI → T-22 👤 Te+B1
+**Scope:** A `job_status_history` tábla minden `transitionJob` hívásnál sorral bővül, de a job detail oldalon nincs UI ehhez. A diszpécser nem látja, ki mikor és miért változtatta a státuszt.
+**Fájlok:** `app/(app)/jobs/[id]/page.tsx`, `components/jobs/JobTimeline.tsx` (új)
+**Elfogadás:** az Áttekintés fülön vertikális timeline rendereli a `job_status_history` sorait (státusz, szerelő neve, időpont, opcionális megjegyzés); relatív időformátum (`2 perce`, `tegnap`); üres állapot: „Még nincs státuszváltozás."
+
+### T-101 ❌ [P2] E3: Fotógaléria a job detail oldalon → T-43 👤 Te+B1
+**Scope:** A szerelők már feltöltenek fotókat (T-43, Supabase Storage + `attachments` tábla), de a job detail oldalon ezek csak sima linkek — nincs galéria nézet.
+**Fájlok:** `app/(app)/jobs/[id]/page.tsx`, `components/jobs/PhotoGallery.tsx` (új)
+**Elfogadás:** CSS grid (desktop: 3 oszlop, mobil: vízszintes scroll sáv) a feltöltött képekből; kattintásra shadcn Dialog lightbox teljes képpel; üres állapot: „Nincs fotó feltöltve."; képek lazy loading-gal.
+
+### T-102 ❌ [P1] E4: Következő szerviz CTA a lezárt jobban → T-11, T-97 👤 Te+B1
+**Scope:** Ha egy job státusza `kesz`-re vált és a jobhoz rendelt berendezés `next_service_due` ≤ 90 napon belül van, a diszpécser nem kap figyelmeztetést — az ügyféllel való kapcsolat megszakad a számlázás után.
+**Fájlok:** `app/(app)/jobs/[id]/page.tsx`
+**Elfogadás:** ha `job.status === 'kesz'` és `equipment.next_service_due ≤ NOW() + 90 days`, az Áttekintés fülön kék CTA kártya jelenik meg: „Ez a berendezés következő szervize: [dátum] — Előfoglalás?" gombbal; a gomb a `/calendar`-ra navigál az ügyfél + berendezés előtöltve; a CTA csak akkor látható, ha van `equipment_id` a jobban.
+
+### T-103 ❌ [P2] E5: Diszpécseri megjegyzés az időponton → T-23 👤 B1
+**Scope:** Nincs hely belső megjegyzésnek az időponton (pl. „eb van az udvaron", „reggeli sáv preferált"). A diszpécser WhatsAppban küld üzenetet a szerelőnek, ami elvész.
+**Fájlok:** `supabase/migrations/0038_appointments_notes.sql`, `components/booking/CalendarBookingDialog.tsx`, `components/booking/BookingDropup.tsx`
+**Elfogadás:** `appointments.notes text` mező (migration); a foglalási dialógban szerkeszthető textarea; a naptár esemény tooltipjében megjelenik az első 80 karakter; a szerelő a saját időpontján is látja; RLS: nincs változás, a meglévő `technician` olvasási policy lefedi.
+
+### T-104 ❌ [P1] E6: Dunning cron — késedelmes számla emlékeztetők → T-31 👤 B2
+**Scope:** Kiállított, nem fizetett számlák esetén nincs automatikus emlékeztető. A tenant kézzel kénytelen utánanézni. A `dunning_count` mező (migration 0022) és a billing-lifecycle cron minta már létezik.
+**Fájlok:** `app/api/cron/dunning/route.ts` (új), `vercel.json`
+**Elfogadás:** napi cron (`0 9 * * *`); lekéri az `issued` státuszú, `fizetve = false` számlákat ahol `issued_at + 3/7/14 nap = ma` AND `dunning_count < 3`; SMS/email küldés a meglévő notification connector-rel; `dunning_count++` + `dunning_sent_at = NOW()` frissítés; idempotens (CRON_SECRET auth); eredmény a T-105 cron_run_logs táblába kerül.
+
+### T-105 ❌ [P1] E7: cron_run_logs tábla — cron futás observabilitás → T-104, T-09 👤 B1
+**Scope:** Ha egy cron rosszul fut (0 értesítés küldve, de 10-et kellett volna), nincs mód visszakeresni mi történt a Vercel function logok nélkül. A billing-lifecycle és service-reminders cron visszaadja az eredményobjektumot, de csak a logban marad.
+**Fájlok:** `supabase/migrations/0038_cron_run_logs.sql` (új), `app/api/cron/billing-lifecycle/route.ts`, `app/api/cron/service-reminders/route.ts`, `app/api/cron/dunning/route.ts`
+**Elfogadás:** `cron_run_logs(id, cron_name text, ran_at timestamptz, items_processed int, errors jsonb, duration_ms int)` tábla; minden cron a futás végén beszúr egy sort service kulccsal; RLS: csak service role írhat, owner/dispatcher olvas; 90 napos retention purge a futás elején (`DELETE WHERE ran_at < NOW() - INTERVAL '90 days'`).
+
+### T-106 ❌ [P1] generateJobNumber() DRY refaktor → T-22, T-26 👤 B1
+**Scope:** A `generateJobNumber()` logika két helyen van implementálva: `lib/jobs/actions.ts:69` és `components/booking/actions.ts:48`. Ha a logika eltér (pl. formátum változás), csak az egyiket javítják.
+**Fájlok:** `lib/jobs/job-number.ts` (új), `lib/jobs/actions.ts`, `components/booking/actions.ts`
+**Elfogadás:** `lib/jobs/job-number.ts` exportálja `generateJobNumber(companyId, supabase)`; mindkét hívó importálja; az eredeti implementációk törlődnek; típusok zöldek.
+
+### T-107 ❌ [P1] RPC tenant izolációs teszt → T-96 👤 B1
+**Scope:** A T-96-os biztonsági javítás nincs teszttel fedve. Ha valaki tévedésből eltávolítja az ownership ellenőrzést egy jövőbeli migrációban, néma regresszió lesz.
+**Fájlok:** `tests/rpc-isolation.test.ts` (új)
+**Elfogadás:** Vitest mock: `getAuthContext` company-A felhasználót ad vissza; a `create_customer_with_site` hívása company-B `p_company_id`-val hibát ad vissza (`error` nem null); az eredmény nem tartalmaz `customer_id`-t; az RPC mock a `rpc()` hívás paramétereit ellenőrzi.
+
+### T-108 ❌ [P1] Időpontfoglalás munkából — JobBookingButton (slot-first) 👤 B1
+**Scope:** Telefon-intake után a diszpécser a job detail oldalon azonnal időpontot foglalhat anélkül, hogy a /calendar oldalra navigálna. A popup kihagyja a "szerviz/gép beállítás" lépést (ezek már ismertek a munkából) és egyből a sáv-választóra ugrik. A gomb mindig látható; ha van már időpont: "Még egy időpont" felirattal.
+**Fájlok:**
+- `components/booking/actions.ts` — új `addAppointmentToJob()` Server Action (conflict check + insert appointments row)
+- `components/jobs/JobBookingButton.tsx` — új client komponens, slot-first dialog, "Munka/Felmérés" toggle (default: munka)
+- `app/(app)/jobs/[id]/page.tsx` — company settings + technicians fetch, JobBookingButton beillesztése az időpontlista fölé (canEdit esetén)
+**Elfogadás:** Diszpécser a job detail oldalon megnyitja a dialógot → ManualSlotPicker jelenik meg → sáv kiválasztva → mentés → appointment létrejön a job_id-val → az időpontlista frissül; a /calendar linkre váltás nélkül; ha nincs időpont: "Időpont foglalása"; ha van: "Még egy időpont".
+
+---
 
 > **Mikor indítható:** T-65 (pilot) után, legalább 3 pilot céggel, fizetőképes érdeklődéssel. A Phase 2 moat = recurring bevétel a tenantnak, GPS tracking, offline mobil.
 
