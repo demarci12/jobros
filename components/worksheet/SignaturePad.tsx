@@ -84,11 +84,10 @@ export function SignaturePad({
     if (!canvas || !hasStrokes) return;
     setIsSaving(true);
     try {
-      const blob = await new Promise<Blob>((res, rej) =>
-        canvas.toBlob(b => b ? res(b) : rej(new Error("Canvas export failed")), "image/png")
-      );
+      const dataUrl = canvas.toDataURL("image/png");
+      const base64 = dataUrl.split(",")[1];
       const { saveSignature } = await import("./worksheet-actions");
-      const result = await saveSignature({ jobId, signerRole, signerName, blob });
+      const result = await saveSignature({ jobId, signerRole, signerName, base64 });
       if (result?.error) { toast.error(result.error); return; }
       toast.success("Aláírás mentve.");
       setSaved(true);

@@ -44,6 +44,36 @@ export async function createQuote(jobId: string) {
   }
 
   if (!quoteData) return { error: quoteError?.code === "23505" ? "Árajánlat szám ütközés, próbáld újra." : quoteError?.message ?? "Hiba." };
+
+  // Auto-apply default quote template from the job's service if configured
+  const { data: jobService } = await ctx.supabase
+    .from("jobs")
+    .select("services(default_quote_template_id)")
+    .eq("id", jobId).eq("company_id", ctx.companyId)
+    .maybeSingle();
+  const defaultTemplateId = (jobService as any)?.services?.default_quote_template_id;
+  if (defaultTemplateId) {
+    const { data: tmpl } = await ctx.supabase
+      .from("job_templates").select("default_lines")
+      .eq("id", defaultTemplateId).eq("company_id", ctx.companyId).maybeSingle();
+    const defaultLines = (tmpl?.default_lines as any[]) ?? [];
+    if (defaultLines.length > 0) {
+      await ctx.supabase.from("quote_lines").insert(
+        defaultLines.map((l: any) => ({
+          company_id: ctx.companyId,
+          quote_id: quoteData!.id,
+          description: l.description ?? "",
+          quantity: l.quantity ?? 1,
+          unit: l.unit ?? "db",
+          unit_price: l.unit_price ?? 0,
+          vat_rate: l.vat_rate ?? 27,
+          is_optional: false,
+          is_selected: true,
+        }))
+      );
+    }
+  }
+
   revalidatePath(`/jobs/${jobId}/quote`);
   revalidatePath(`/jobs/${jobId}`);
   return { quote: { ...quoteData, lines: [] } };

@@ -24,19 +24,19 @@ export async function saveSignature({
   jobId,
   signerRole,
   signerName,
-  blob,
+  base64,
 }: {
   jobId: string;
   signerRole: string;
   signerName: string;
-  blob: Blob;
+  base64: string;
 }) {
   const ctx = await getJobCtx(jobId);
   if (!ctx?.canWrite) return { error: "Nincs jogosultság." };
 
   const service = createServiceClient();
   const fileName = `${ctx.companyId}/${jobId}/${Date.now()}.png`;
-  const buffer = Buffer.from(await blob.arrayBuffer());
+  const buffer = Buffer.from(base64, "base64");
 
   const { error: uploadError } = await service.storage
     .from("signatures")

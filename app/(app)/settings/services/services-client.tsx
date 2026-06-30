@@ -17,7 +17,11 @@ type Service = {
   id: string; name: string; activity: string; default_duration_min: number;
   requires_survey: boolean; default_price: number | null; vat_rate: number;
   color: string | null; is_active: boolean; sort_order: number;
+  default_quote_template_id: string | null;
+  default_worksheet_template_id: string | null;
 };
+
+type Template = { id: string; name: string };
 
 const ACTIVITY_LABELS: Record<string, string> = {
   szerviz: "Szerviz", telepites: "Telepítés", felszeres: "Felszerelés",
@@ -26,10 +30,19 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 const COLORS = ["#3b82f6","#10b981","#f59e0b","#ef4444","#8b5cf6","#ec4899","#06b6d4","#84cc16"];
 
-function ServiceForm({ service, onDone }: { service?: Service; onDone: () => void }) {
+function ServiceForm({
+  service, quoteTemplates, worksheetTemplates, onDone,
+}: {
+  service?: Service;
+  quoteTemplates: Template[];
+  worksheetTemplates: Template[];
+  onDone: () => void;
+}) {
   const router = useRouter();
   const [activity, setActivity] = useState(service?.activity ?? "szerviz");
   const [color, setColor] = useState(service?.color ?? COLORS[0]);
+  const [quoteTmplId, setQuoteTmplId] = useState(service?.default_quote_template_id ?? "");
+  const [worksheetTmplId, setWorksheetTmplId] = useState(service?.default_worksheet_template_id ?? "");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -37,6 +50,8 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone: () => voi
     const fd = new FormData(e.currentTarget);
     fd.set("activity", activity);
     fd.set("color", color);
+    fd.set("default_quote_template_id", quoteTmplId);
+    fd.set("default_worksheet_template_id", worksheetTmplId);
     startTransition(async () => {
       const result = service
         ? await updateService(service.id, fd)
@@ -77,7 +92,34 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone: () => voi
           <Input id="vat_rate" name="vat_rate" type="number" min={0} max={27}
             defaultValue={service?.vat_rate ?? 27} />
         </div>
+
+        {quoteTemplates.length > 0 && (
+          <div className="space-y-1">
+            <Label>Alapértelmezett árajánlat sablon</Label>
+            <Select value={quoteTmplId} onValueChange={v => setQuoteTmplId(v ?? "")}>
+              <SelectTrigger><SelectValue placeholder="— Nincs —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— Nincs —</SelectItem>
+                {quoteTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {worksheetTemplates.length > 0 && (
+          <div className="space-y-1">
+            <Label>Alapértelmezett munkalap sablon</Label>
+            <Select value={worksheetTmplId} onValueChange={v => setWorksheetTmplId(v ?? "")}>
+              <SelectTrigger><SelectValue placeholder="— Nincs —" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">— Nincs —</SelectItem>
+                {worksheetTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
+
       <div className="space-y-1">
         <Label>Szín</Label>
         <div className="flex gap-2 flex-wrap">
@@ -103,7 +145,13 @@ function ServiceForm({ service, onDone }: { service?: Service; onDone: () => voi
   );
 }
 
-export function ServicesClient({ services }: { services: Service[] }) {
+export function ServicesClient({
+  services, quoteTemplates = [], worksheetTemplates = [],
+}: {
+  services: Service[];
+  quoteTemplates?: Template[];
+  worksheetTemplates?: Template[];
+}) {
   const router = useRouter();
   const [addingNew, setAddingNew] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -122,7 +170,13 @@ export function ServicesClient({ services }: { services: Service[] }) {
   return (
     <div className="space-y-4">
       {addingNew ? (
-        <Card><CardContent className="pt-5"><ServiceForm onDone={() => setAddingNew(false)} /></CardContent></Card>
+        <Card><CardContent className="pt-5">
+          <ServiceForm
+            quoteTemplates={quoteTemplates}
+            worksheetTemplates={worksheetTemplates}
+            onDone={() => setAddingNew(false)}
+          />
+        </CardContent></Card>
       ) : (
         <Button onClick={() => setAddingNew(true)} variant="outline">
           <Plus size={16} className="mr-2" /> Új szolgáltatás
@@ -138,7 +192,12 @@ export function ServicesClient({ services }: { services: Service[] }) {
           <Card key={s.id} className={s.is_active ? "" : "opacity-60"}>
             <CardContent className="py-3">
               {editingId === s.id ? (
-                <ServiceForm service={s} onDone={() => setEditingId(null)} />
+                <ServiceForm
+                  service={s}
+                  quoteTemplates={quoteTemplates}
+                  worksheetTemplates={worksheetTemplates}
+                  onDone={() => setEditingId(null)}
+                />
               ) : (
                 <div className="flex items-center gap-3">
                   <GripVertical size={16} className="text-muted-foreground shrink-0 cursor-grab" />

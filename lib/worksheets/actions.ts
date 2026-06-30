@@ -41,6 +41,35 @@ export async function upsertWorksheet(jobId: string, formData: FormData) {
       .select("id").single();
     if (error) return { error: error.message };
     worksheetId = data.id;
+
+    // Auto-apply default worksheet template from the job's service if configured
+    const { data: jobService } = await ctx.supabase
+      .from("jobs")
+      .select("services(default_worksheet_template_id)")
+      .eq("id", jobId).eq("company_id", ctx.companyId)
+      .maybeSingle();
+    const defaultTemplateId = (jobService as any)?.services?.default_worksheet_template_id;
+    if (defaultTemplateId) {
+      const { data: tmpl } = await ctx.supabase
+        .from("job_templates").select("default_lines")
+        .eq("id", defaultTemplateId).eq("company_id", ctx.companyId).maybeSingle();
+      const defaultLines = (tmpl?.default_lines as any[]) ?? [];
+      if (defaultLines.length > 0) {
+        await ctx.supabase.from("worksheet_lines").insert(
+          defaultLines.map((l: any) => ({
+            company_id: ctx.companyId,
+            worksheet_id: worksheetId,
+            description: l.description ?? "",
+            quantity: l.quantity ?? 1,
+            unit: l.unit ?? "db",
+            unit_price: l.unit_price ?? 0,
+            vat_rate: l.vat_rate ?? 27,
+            line_total: (l.quantity ?? 1) * (l.unit_price ?? 0),
+            is_labor: l.is_labor ?? false,
+          }))
+        );
+      }
+    }
   }
 
   revalidatePath(`/jobs/${jobId}/worksheet`);

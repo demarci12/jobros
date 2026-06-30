@@ -9,6 +9,8 @@ export const serviceSchema = z.object({
   vat_rate: z.coerce.number().min(0).max(27).default(27),
   color: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
+  default_quote_template_id: z.string().uuid().optional().nullable(),
+  default_worksheet_template_id: z.string().uuid().optional().nullable(),
 });
 
 export type ServiceInput = z.infer<typeof serviceSchema>;

@@ -25,6 +25,8 @@ function parseService(formData: FormData) {
     vat_rate: formData.get("vat_rate"),
     color: formData.get("color") || null,
     is_active: formData.get("is_active") !== "false",
+    default_quote_template_id: formData.get("default_quote_template_id") || null,
+    default_worksheet_template_id: formData.get("default_worksheet_template_id") || null,
   });
 }
 

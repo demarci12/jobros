@@ -62,42 +62,37 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     : { data: null };
 
   return (
-    <div className="space-y-8 max-w-2xl">
-      {worksheet && (
-        <div className="flex justify-end">
-          <Link href={`/api/pdf/worksheet/${worksheet.id}`} target="_blank">
-            <Button variant="outline" size="sm">
-              <FileDown size={14} className="mr-1.5" /> Munkalap PDF
-            </Button>
-          </Link>
+    <div className="space-y-0 max-w-2xl divide-y">
+      {/* Ellenőrzőlista + Elvégzett munka — egy egységes munkalapként */}
+      {(checklistItems ?? []).length > 0 || (checklistTemplates ?? []).length > 0 ? (
+        <div className="pb-6">
+          <ChecklistPanel
+            jobId={params.id}
+            initialItems={(checklistItems ?? []) as any}
+            templates={(checklistTemplates ?? []) as any}
+            canEdit={canEdit}
+          />
         </div>
-      )}
-      <WorksheetClient
-        jobId={params.id}
-        worksheet={{
-          id: worksheet?.id ?? null,
-          work_done: worksheet?.work_done ?? null,
-          lines: (lines ?? []) as any,
-        }}
-        canEdit={canEdit}
-        catalogMaterials={(catalogMaterials ?? []) as any}
-        worksheetTemplates={(worksheetTemplates ?? []) as any}
-      />
+      ) : null}
 
-      {/* Ellenőrzőlista */}
-      <div className="space-y-2">
-        <ChecklistPanel
+      <div className="py-6">
+        <WorksheetClient
           jobId={params.id}
-          initialItems={(checklistItems ?? []) as any}
-          templates={(checklistTemplates ?? []) as any}
+          worksheet={{
+            id: worksheet?.id ?? null,
+            work_done: worksheet?.work_done ?? null,
+            lines: (lines ?? []) as any,
+          }}
           canEdit={canEdit}
+          catalogMaterials={(catalogMaterials ?? []) as any}
+          worksheetTemplates={(worksheetTemplates ?? []) as any}
         />
       </div>
 
       {/* Fotók */}
       {canEdit && (
-        <div className="space-y-2">
-          <h2 className="font-semibold text-sm">Fotók</h2>
+        <div className="py-6 space-y-3">
+          <h2 className="text-sm font-semibold">Fotók</h2>
           <PhotoUpload
             jobId={params.id}
             initialAttachments={(attachments ?? []) as any}
@@ -107,8 +102,8 @@ export default async function WorksheetPage({ params }: { params: { id: string }
 
       {/* Aláírás */}
       {canEdit && (
-        <div className="space-y-2">
-          <h2 className="font-semibold text-sm">Aláírás</h2>
+        <div className="py-6 space-y-3">
+          <h2 className="text-sm font-semibold">Aláírás</h2>
           {(signatures ?? []).length > 0 && (
             <div className="flex gap-3 flex-wrap">
               {(signatures ?? []).map((s: any) => (
@@ -122,6 +117,16 @@ export default async function WorksheetPage({ params }: { params: { id: string }
             </div>
           )}
           <SignaturePad jobId={params.id} />
+        </div>
+      )}
+
+      {worksheet && (
+        <div className="pt-4 flex justify-end">
+          <Link href={`/api/pdf/worksheet/${worksheet.id}`} target="_blank">
+            <Button variant="outline" size="sm">
+              <FileDown size={14} className="mr-1.5" /> Munkalap PDF
+            </Button>
+          </Link>
         </div>
       )}
     </div>
