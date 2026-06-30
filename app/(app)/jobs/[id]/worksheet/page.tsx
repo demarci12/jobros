@@ -84,6 +84,7 @@ export default async function WorksheetPage({ params }: { params: { id: string }
             lines: (lines ?? []) as any,
           }}
           canEdit={canEdit}
+          locked={signatures != null && signatures.length > 0}
           catalogMaterials={(catalogMaterials ?? []) as any}
           worksheetTemplates={(worksheetTemplates ?? []) as any}
         />

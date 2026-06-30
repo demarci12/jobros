@@ -38,6 +38,22 @@ export async function searchCustomers(query: string) {
   return data ?? [];
 }
 
+export async function searchCustomersByPhone(phone: string) {
+  const ctx = await getCompanyCtx(["owner", "dispatcher", "technician", "accountant"]);
+  if (!ctx) return [];
+  const q = phone.trim();
+  if (q.length < 4) return [];
+  const { data } = await ctx.supabase
+    .from("customers")
+    .select("id, name, phone")
+    .eq("company_id", ctx.companyId)
+    .is("deleted_at", null)
+    .ilike("phone", `%${q}%`)
+    .order("name")
+    .limit(3);
+  return (data ?? []) as { id: string; name: string; phone: string | null }[];
+}
+
 // --- Quick create (intake) ---
 
 export async function createQuickCustomer(formData: FormData) {

@@ -2,10 +2,11 @@ import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { Badge } from "@/components/ui/badge";
-import { User, MapPin, Wrench, Calendar } from "lucide-react";
+import { User, MapPin, Wrench, Calendar, ChevronRight } from "lucide-react";
 import { type JobStatus } from "@/lib/jobs/status-machine";
 import { EquipmentSelector } from "@/components/jobs/EquipmentSelector";
 import { JobBookingButton } from "@/components/jobs/JobBookingButton";
+import { JobTimeline } from "@/components/jobs/JobTimeline";
 
 const defaultHours = {
   mon: { open: true,  start: "08:00", end: "17:00" },
@@ -25,7 +26,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
   const { data: job } = await supabase
     .from("jobs")
     .select(`
-      id, description, created_at, equipment_id,
+      id, description, created_at, equipment_id, status,
       customers(id, name, phone, email),
       sites(id, address, city),
       services(name)
@@ -39,7 +40,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
 
   const in90Days = new Date(Date.now() + 90 * 86400_000).toISOString();
 
-  const [{ data: appointments }, { data: equipment }, { data: technicians }, { data: company }, { data: upcomingAppts }] = await Promise.all([
+  const [{ data: appointments }, { data: equipment }, { data: technicians }, { data: company }, { data: upcomingAppts }, { data: history }] = await Promise.all([
     supabase
       .from("appointments")
       .select("id, kind, starts_at, ends_at, status")
@@ -55,6 +56,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
     supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", companyId).eq("role", "technician").eq("is_active", true),
     supabase.from("companies").select("booking_mode, default_slot_duration_min, working_hours").eq("id", companyId).single(),
     supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", companyId).gte("starts_at", new Date().toISOString()).lte("starts_at", in90Days).neq("status", "lemondva"),
+    supabase.from("job_status_history").select("id, from_status, to_status, created_at, note, profiles(full_name)").eq("job_id", params.id).order("created_at"),
   ]);
 
   const techList = (technicians ?? []).map((t: any) => ({ id: t.profiles?.id ?? t.user_id, name: t.profiles?.full_name ?? "Szerelő" }));
@@ -112,6 +114,31 @@ export default async function JobOverviewPage({ params }: { params: { id: string
         )}
       </div>
 
+      {/* Következő szerviz CTA (T-102) */}
+      {["kesz", "fizetve"].includes((job as any).status) && (job as any).equipment_id && (() => {
+        const eq = (equipment ?? []).find((e: any) => e.id === (job as any).equipment_id);
+        return (
+          <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3 space-y-1.5">
+            <p className="text-sm font-medium text-green-900">Következő szerviz időzítése</p>
+            {eq?.next_service_due && (
+              <p className="text-xs text-green-700">
+                Soron következő szerviz esedékessége:{" "}
+                <span className="font-medium">
+                  {new Date(eq.next_service_due).toLocaleDateString("hu-HU", { dateStyle: "short" })}
+                </span>
+              </p>
+            )}
+            <Link
+              href={`/customers/${(job as any).customers?.id ?? ""}?equipment=${(job as any).equipment_id}`}
+              className="inline-flex items-center gap-1 text-sm font-medium text-green-800 hover:underline"
+            >
+              Új munkát indít ezen a berendezésen
+              <ChevronRight size={14} />
+            </Link>
+          </div>
+        );
+      })()}
+
       {/* Időpontok */}
       <div>
         <div className="flex items-center justify-between mb-2">
@@ -144,6 +171,12 @@ export default async function JobOverviewPage({ params }: { params: { id: string
         ) : (
           <p className="text-sm text-muted-foreground">Nincs ütemezett időpont ehhez a munkához.</p>
         )}
+      </div>
+
+      {/* Státusz-előzmények (T-100) */}
+      <div>
+        <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Előzmények</h2>
+        <JobTimeline entries={(history ?? []) as any} />
       </div>
 
     </div>

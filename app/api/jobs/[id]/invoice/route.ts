@@ -55,7 +55,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   let result;
   try {
-    result = await provider.issueInvoice({
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15_000);
+    const invoicePromise = provider.issueInvoice({
       idempotencyKey,
       customerName: customer?.name ?? "Ismeretlen ügyfél",
       customerTaxNumber: customer?.tax_number ?? undefined,
@@ -68,7 +70,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })),
       issuerCompanyId: cu.company_id,
     });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT")), 15_000)
+    );
+    try {
+      result = await Promise.race([invoicePromise, timeoutPromise]);
+    } finally {
+      clearTimeout(timeoutId);
+    }
   } catch (err: unknown) {
+    if ((err as Error).message === "TIMEOUT") {
+      return NextResponse.json({ error: "A számlázó nem válaszolt — próbáld újra." }, { status: 504 });
+    }
     return NextResponse.json({ error: (err as Error).message }, { status: 502 });
   }
 

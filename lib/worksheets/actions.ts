@@ -134,11 +134,10 @@ export async function deleteWorksheetLine(lineId: string, worksheetId: string, j
       .from("signatures")
       .select("id")
       .eq("job_id", jobId)
-      .eq("signer_role", "customer")
       .limit(1)
       .maybeSingle();
     if (sig) {
-      return { error: "A munkalap már aláírva — törlés nem lehetséges." };
+      return { error: "Az aláírás után a tételek nem módosíthatók." };
     }
   }
 

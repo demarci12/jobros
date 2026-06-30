@@ -1,15 +1,15 @@
 "use client";
 
-import { useState, useTransition, useRef } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Phone, Search, UserPlus, ChevronRight, Loader2 } from "lucide-react";
+import { Phone, Search, UserPlus, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { searchCustomers, createQuickCustomer, getSiteForCustomer, getServicesForIntake } from "@/lib/crm/actions";
+import { searchCustomers, searchCustomersByPhone, createQuickCustomer, getSiteForCustomer, getServicesForIntake } from "@/lib/crm/actions";
 import { createJob } from "@/lib/jobs/actions";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
@@ -45,6 +45,7 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
     setJobTitle("");
     setJobNote("");
     setJobServiceId("");
+    setPhoneMatches([]);
   }
 
   function handleOpen(v: boolean) {
@@ -78,6 +79,18 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   const [ncEmail, setNcEmail] = useState("");
   const [ncAddress, setNcAddress] = useState("");
   const [ncCity, setNcCity] = useState("");
+  const [phoneMatches, setPhoneMatches] = useState<{ id: string; name: string; phone: string | null }[]>([]);
+  const phoneDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    clearTimeout(phoneDebounceRef.current);
+    if (ncPhone.trim().length < 4) { setPhoneMatches([]); return; }
+    phoneDebounceRef.current = setTimeout(async () => {
+      const res = await searchCustomersByPhone(ncPhone);
+      setPhoneMatches(res);
+    }, 300);
+    return () => clearTimeout(phoneDebounceRef.current);
+  }, [ncPhone]);
 
   function openNewCustomer() {
     setNcName(query); // pre-fill with what was typed
@@ -250,6 +263,30 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
                   <Input value={ncEmail} onChange={e => setNcEmail(e.target.value)} placeholder="nev@email.hu" type="email" />
                 </div>
               </div>
+              {phoneMatches.length > 0 && (
+                <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-700 p-3 space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                    <AlertTriangle size={13} />
+                    Úgy tűnik, ez az ügyfél már szerepel:
+                  </div>
+                  {phoneMatches.map(m => (
+                    <div key={m.id} className="flex items-center justify-between gap-2">
+                      <div>
+                        <span className="text-sm font-semibold">{m.name}</span>
+                        {m.phone && <span className="text-xs text-muted-foreground ml-1.5">{m.phone}</span>}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 text-xs shrink-0 border-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/40"
+                        onClick={() => selectCustomer({ id: m.id, name: m.name, phone: m.phone, email: null })}
+                      >
+                        Kiválasztom
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">Cím *</Label>
                 <Input value={ncAddress} onChange={e => setNcAddress(e.target.value)} placeholder="Fő utca 1." />

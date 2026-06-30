@@ -43,12 +43,14 @@ export function WorksheetClient({
   jobId,
   worksheet,
   canEdit,
+  locked = false,
   catalogMaterials = [],
   worksheetTemplates = [],
 }: {
   jobId: string;
   worksheet: Worksheet;
   canEdit: boolean;
+  locked?: boolean;
   catalogMaterials?: CatalogMaterial[];
   worksheetTemplates?: WorksheetTemplate[];
 }) {
@@ -210,7 +212,7 @@ export function WorksheetClient({
                     {canEdit && (
                       <td className="px-2 py-2">
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                          disabled={isPending} onClick={() => handleDeleteLine(l.id)}>
+                          disabled={isPending || locked} onClick={() => handleDeleteLine(l.id)}>
                           <Trash2 size={13} />
                         </Button>
                       </td>
@@ -234,7 +236,7 @@ export function WorksheetClient({
         )}
 
         {/* Új tétel form */}
-        {canEdit && (
+        {canEdit && !locked && (
           <div className="rounded-lg border p-3 space-y-2 bg-muted/20">
             <p className="text-xs font-medium text-muted-foreground">Új tétel</p>
 
