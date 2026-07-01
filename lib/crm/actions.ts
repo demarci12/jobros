@@ -109,11 +109,44 @@ export async function getServicesForIntake() {
   if (!ctx) return [];
   const { data } = await ctx.supabase
     .from("services")
-    .select("id, name")
+    .select("id, name, default_duration_min, requires_survey, follow_up_count")
     .eq("company_id", ctx.companyId)
     .eq("is_active", true)
     .order("name");
-  return data ?? [];
+  return (data ?? []).map(s => ({
+    id: s.id,
+    name: s.name,
+    duration_min: s.default_duration_min ?? null,
+    requiresSurvey: s.requires_survey ?? false,
+    followUpCount: s.follow_up_count ?? 2,
+  }));
+}
+
+const DEFAULT_WORKING_HOURS = {
+  mon: { open: true, start: "08:00", end: "17:00" },
+  tue: { open: true, start: "08:00", end: "17:00" },
+  wed: { open: true, start: "08:00", end: "17:00" },
+  thu: { open: true, start: "08:00", end: "17:00" },
+  fri: { open: true, start: "08:00", end: "17:00" },
+  sat: { open: false, start: "08:00", end: "13:00" },
+  sun: { open: false, start: "08:00", end: "13:00" },
+};
+
+export async function getIntakeBookingConfig() {
+  const ctx = await getCompanyCtx(["owner", "dispatcher"]);
+  if (!ctx) return { technicians: [], defaultSlotDurationMin: 60, workingHours: DEFAULT_WORKING_HOURS, existingAppointments: [] };
+  const in90Days = new Date(Date.now() + 90 * 86400_000).toISOString();
+  const [{ data: technicians }, { data: company }, { data: existingAppointments }] = await Promise.all([
+    ctx.supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", ctx.companyId).eq("role", "technician").eq("is_active", true),
+    ctx.supabase.from("companies").select("default_slot_duration_min, working_hours").eq("id", ctx.companyId).single(),
+    ctx.supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", ctx.companyId).gte("starts_at", new Date().toISOString()).lte("starts_at", in90Days).neq("status", "lemondva"),
+  ]);
+  return {
+    technicians: (technicians ?? []).map((t: any) => ({ id: t.profiles?.id ?? t.user_id, name: t.profiles?.full_name ?? "Szerelő" })),
+    defaultSlotDurationMin: company?.default_slot_duration_min ?? 60,
+    workingHours: (company?.working_hours as typeof DEFAULT_WORKING_HOURS) ?? DEFAULT_WORKING_HOURS,
+    existingAppointments: (existingAppointments ?? []) as { starts_at: string; ends_at: string; technician_id: string | null }[],
+  };
 }
 
 // --- Customer CRUD ---

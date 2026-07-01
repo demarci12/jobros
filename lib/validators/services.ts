@@ -5,6 +5,7 @@ export const serviceSchema = z.object({
   activity: z.enum(["szerviz", "telepites", "felszeres", "csere", "felmeres", "garancias", "egyeb"]).default("szerviz"),
   default_duration_min: z.coerce.number().int().min(15).max(480).default(60),
   requires_survey: z.boolean().default(false),
+  follow_up_count: z.coerce.number().int().min(0).max(10).default(2),
   default_price: z.coerce.number().min(0).optional().nullable(),
   vat_rate: z.coerce.number().min(0).max(27).default(27),
   color: z.string().optional().nullable(),

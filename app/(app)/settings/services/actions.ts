@@ -21,6 +21,7 @@ function parseService(formData: FormData) {
     activity: formData.get("activity"),
     default_duration_min: formData.get("default_duration_min"),
     requires_survey: formData.get("requires_survey") === "true",
+    follow_up_count: formData.get("follow_up_count") || 2,
     default_price: formData.get("default_price") || null,
     vat_rate: formData.get("vat_rate"),
     color: formData.get("color") || null,

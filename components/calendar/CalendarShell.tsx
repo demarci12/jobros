@@ -46,7 +46,7 @@ function monthKey(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-type Service = { id: string; name: string; duration_min: number | null };
+type Service = { id: string; name: string; duration_min: number | null; requiresSurvey: boolean; followUpCount: number };
 
 export function CalendarShell({
   initialAppointments,

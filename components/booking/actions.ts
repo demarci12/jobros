@@ -8,10 +8,10 @@ import { checkEntitlement } from "@/lib/billing/entitlements";
 const CreateBookingSchema = z.object({
   customerId: z.string().uuid(),
   siteId: z.string().uuid(),
-  serviceId: z.string().uuid().nullable(),
-  equipmentId: z.string().uuid().nullable(),
+  serviceId: z.string().uuid(),
+  equipmentId: z.string().uuid(),
   title: z.string().max(255).nullable(),
-  kind: z.enum(["munka", "felmeres"]),
+  kind: z.enum(["munka", "felmeres", "kovetes"]),
   technicianId: z.string().uuid().nullable(),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),
@@ -94,7 +94,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
 
 const AddAppointmentSchema = z.object({
   jobId: z.string().uuid(),
-  kind: z.enum(["munka", "felmeres"]),
+  kind: z.enum(["munka", "felmeres", "kovetes"]),
   technicianId: z.string().uuid().nullable(),
   startsAt: z.string().datetime(),
   endsAt: z.string().datetime(),

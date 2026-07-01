@@ -9,13 +9,33 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Phone, Search, UserPlus, ChevronRight, Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
-import { searchCustomers, searchCustomersByPhone, createQuickCustomer, getSiteForCustomer, getServicesForIntake } from "@/lib/crm/actions";
-import { createJob } from "@/lib/jobs/actions";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  searchCustomers, searchCustomersByPhone, createQuickCustomer,
+  getServicesForIntake, getIntakeBookingConfig,
+} from "@/lib/crm/actions";
+import { getCustomerSitesAndEquipment, createBooking } from "@/components/booking/actions";
+import { BookingSetupForm } from "@/components/booking/BookingSetupForm";
+import { ManualSlotPicker } from "@/components/booking/ManualSlotPicker";
 
 type Customer = { id: string; name: string; phone: string | null; email: string | null };
+type Service = { id: string; name: string; duration_min: number | null; requiresSurvey: boolean; followUpCount: number };
+type Site = { id: string; address: string; city: string | null; zip?: string | null };
+type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
+type Technician = { id: string; name: string };
+type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };
+type Setup = { siteId: string; serviceId: string; equipmentId: string; title: string; kind: "felmeres" | "munka" | "kovetes" };
 
-type Step = "search" | "new-customer" | "job";
+const DEFAULT_WORKING_HOURS = {
+  mon: { open: true, start: "08:00", end: "17:00" },
+  tue: { open: true, start: "08:00", end: "17:00" },
+  wed: { open: true, start: "08:00", end: "17:00" },
+  thu: { open: true, start: "08:00", end: "17:00" },
+  fri: { open: true, start: "08:00", end: "17:00" },
+  sat: { open: false, start: "08:00", end: "13:00" },
+  sun: { open: false, start: "08:00", end: "13:00" },
+};
+
+type Step = "search" | "new-customer" | "setup" | "slot";
 
 export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -24,27 +44,30 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
   const [results, setResults] = useState<Customer[]>([]);
   const [searching, setSearching] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const [siteId, setSiteId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  const [jobTitle, setJobTitle] = useState("");
-  const [jobNote, setJobNote] = useState("");
-  const [services, setServices] = useState<{ id: string; name: string }[]>([]);
-  const [jobServiceId, setJobServiceId] = useState<string>("");
+  const [services, setServices] = useState<Service[]>([]);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [setup, setSetup] = useState<Setup | null>(null);
+
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [existingAppointments, setExistingAppointments] = useState<Appointment[]>([]);
+  const [defaultSlotDurationMin, setDefaultSlotDurationMin] = useState(60);
+  const [workingHours, setWorkingHours] = useState(DEFAULT_WORKING_HOURS);
 
   function reset() {
     setStep("search");
     setQuery("");
     setResults([]);
     setSelectedCustomer(null);
-    setCustomerId(null);
-    setSiteId(null);
-    setJobTitle("");
-    setJobNote("");
-    setJobServiceId("");
+    setServices([]);
+    setSites([]);
+    setEquipment([]);
+    setSetup(null);
     setPhoneMatches([]);
   }
 
@@ -65,12 +88,23 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
     }, 250);
   }
 
-  function selectCustomer(c: Customer) {
+  async function selectCustomer(c: Customer) {
     setSelectedCustomer(c);
-    setCustomerId(c.id);
-    getSiteForCustomer(c.id).then(setSiteId);
-    getServicesForIntake().then(setServices);
-    setStep("job");
+    setLoadingDetails(true);
+    const [{ sites: s, equipment: e }, svc, cfg] = await Promise.all([
+      getCustomerSitesAndEquipment(c.id),
+      getServicesForIntake(),
+      getIntakeBookingConfig(),
+    ]);
+    setSites(s);
+    setEquipment(e);
+    setServices(svc as Service[]);
+    setTechnicians(cfg.technicians);
+    setExistingAppointments(cfg.existingAppointments);
+    setDefaultSlotDurationMin(cfg.defaultSlotDurationMin);
+    setWorkingHours(cfg.workingHours);
+    setLoadingDetails(false);
+    setStep("setup");
   }
 
   // New customer form state
@@ -111,34 +145,36 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
       fd.set("city", ncCity);
       const res = await createQuickCustomer(fd);
       if ("error" in res && res.error) { toast.error(res.error); return; }
-      const { id, site_id: newSiteId } = res as { id: string; site_id: string; name: string; phone: string | null };
+      const { id } = res as { id: string; site_id: string; name: string; phone: string | null };
       const newCustomer: Customer = { id, name: ncName, phone: ncPhone || null, email: ncEmail || null };
-      setSelectedCustomer(newCustomer);
-      setCustomerId(id);
-      setSiteId(newSiteId);
-      getServicesForIntake().then(setServices);
-      setStep("job");
+      await selectCustomer(newCustomer);
     });
   }
 
-  function handleCreateJob() {
-    if (!customerId) return;
+  const selectedService = services.find(s => s.id === setup?.serviceId);
+  const durationMin = selectedService?.duration_min ?? defaultSlotDurationMin;
+
+  function handleSlotSelect(slot: { start: Date; end: Date }, technicianId: string | null) {
+    if (!selectedCustomer || !setup) return;
     startTransition(async () => {
-      if (!siteId) {
-        toast.error("Az ügyfélhez nincs rögzített helyszín. Előbb add hozzá a CRM-ben.");
+      const result = await createBooking({
+        customerId: selectedCustomer.id,
+        siteId: setup.siteId,
+        serviceId: setup.serviceId,
+        equipmentId: setup.equipmentId,
+        title: setup.title || selectedService?.name || null,
+        kind: setup.kind,
+        technicianId,
+        startsAt: slot.start.toISOString(),
+        endsAt: slot.end.toISOString(),
+      });
+      if (result?.error) {
+        toast.error(result.error);
         return;
       }
-      const fd = new FormData();
-      fd.set("customer_id", customerId);
-      fd.set("site_id", siteId);
-      if (jobTitle) fd.set("title", jobTitle);
-      if (jobNote) fd.set("description", jobNote);
-      if (jobServiceId) fd.set("service_id", jobServiceId);
-      const res = await createJob(fd);
-      if ("error" in res && res.error) { toast.error(res.error); return; }
-      toast.success("Munka létrehozva!");
+      toast.success("Foglalás létrehozva!");
       handleOpen(false);
-      router.push(`/jobs/${(res as any).id}`);
+      router.push(`/jobs/${(result as any).jobId}`);
     });
   }
 
@@ -155,7 +191,7 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
       </Button>
 
       <Dialog open={open} onOpenChange={handleOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className={step === "slot" ? "sm:max-w-none w-screen h-screen max-h-screen rounded-none overflow-y-auto" : "sm:max-w-md"}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Phone size={16} className="text-primary" />
@@ -168,9 +204,10 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
             const steps = [
               { id: "search", label: "Ügyfél" },
               { id: "new-customer", label: "Adatok" },
-              { id: "job", label: "Munka" },
+              { id: "setup", label: "Foglalás" },
+              { id: "slot", label: "Időpont" },
             ] as const;
-            const currentIdx = step === "search" ? 0 : step === "new-customer" ? 1 : 2;
+            const currentIdx = steps.findIndex(s => s.id === step);
             return (
               <div className="flex items-center gap-0 pb-1">
                 {steps.map((s, i) => (
@@ -310,59 +347,52 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
             </div>
           )}
 
-          {/* ── Step 3: Job details ── */}
-          {step === "job" && selectedCustomer && (
-            <div className="space-y-3">
-              <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center gap-2">
-                <Badge variant="outline" className="text-xs shrink-0">Ügyfél</Badge>
-                <span className="text-sm font-medium">{selectedCustomer.name}</span>
-                {selectedCustomer.phone && (
-                  <span className="text-xs text-muted-foreground ml-auto">{selectedCustomer.phone}</span>
-                )}
+          {/* ── Step 3: Foglalás setup (site + service + equipment) ── */}
+          {step === "setup" && selectedCustomer && (
+            loadingDetails ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="animate-spin text-muted-foreground" size={20} />
               </div>
-
-              <div className="space-y-1.5">
-                <Label>Szolgáltatás</Label>
-                <Select value={jobServiceId} onValueChange={v => setJobServiceId(v ?? "")}>
-                  <SelectTrigger><SelectValue placeholder="Válassz szolgáltatást..." /></SelectTrigger>
-                  <SelectContent>
-                    {services.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs">Probléma / feladat leírása</Label>
-                <Input
-                  autoFocus
-                  value={jobTitle}
-                  onChange={e => setJobTitle(e.target.value)}
-                  placeholder="pl. Klíma nem hűt, szerviz esedékes…"
-                  onKeyDown={e => { if (e.key === "Enter" && jobTitle) handleCreateJob(); }}
+            ) : (
+              <div className="space-y-3">
+                <div className="rounded-md bg-muted/50 px-3 py-2 flex items-center gap-2">
+                  <Badge variant="outline" className="text-xs shrink-0">Ügyfél</Badge>
+                  <span className="text-sm font-medium">{selectedCustomer.name}</span>
+                  {selectedCustomer.phone && (
+                    <span className="text-xs text-muted-foreground ml-auto">{selectedCustomer.phone}</span>
+                  )}
+                </div>
+                <BookingSetupForm
+                  sites={sites}
+                  services={services}
+                  equipment={equipment}
+                  onBack={() => setStep("search")}
+                  onSubmit={v => { setSetup(v); setStep("slot"); }}
                 />
               </div>
+            )
+          )}
 
-              <div className="space-y-1">
-                <Label className="text-xs">Megjegyzés (opcionális)</Label>
-                <Input
-                  value={jobNote}
-                  onChange={e => setJobNote(e.target.value)}
-                  placeholder="Pl. 3. emelet, nincs lift"
-                />
+          {/* ── Step 4: Időpont ── */}
+          {step === "slot" && selectedCustomer && setup && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setStep("setup")}>← Vissza</Button>
+                <span className="text-sm text-muted-foreground">
+                  {selectedService?.name ?? setup.title ?? "Foglalás"} · {durationMin} perc
+                </span>
               </div>
-
-              <div className="flex gap-2 pt-1">
-                <Button variant="ghost" size="sm" onClick={() => setStep("search")}>Vissza</Button>
-                <Button
-                  size="sm"
-                  className="flex-1"
-                  disabled={isPending}
-                  onClick={handleCreateJob}
-                >
-                  {isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
-                  Munka létrehozása →
-                </Button>
-              </div>
+              <ManualSlotPicker
+                durationMin={durationMin}
+                existingAppointments={existingAppointments}
+                technicians={technicians}
+                workingHours={workingHours}
+                onSelect={handleSlotSelect}
+                isPending={isPending}
+              />
+              {isPending && (
+                <p className="text-sm text-muted-foreground text-center">Foglalás létrehozása…</p>
+              )}
             </div>
           )}
         </DialogContent>

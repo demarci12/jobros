@@ -66,7 +66,7 @@ export default async function CalendarPage({
 
     supabase
       .from("services")
-      .select("id, name, default_duration_min")
+      .select("id, name, default_duration_min, requires_survey, follow_up_count")
       .eq("company_id", companyId)
       .eq("is_active", true)
       .order("name"),
@@ -92,7 +92,7 @@ export default async function CalendarPage({
       <CalendarShell
         initialAppointments={(appointments ?? []) as any}
         technicians={techList}
-        services={(services ?? []).map((s: any) => ({ id: s.id, name: s.name, duration_min: s.default_duration_min ?? null }))}
+        services={(services ?? []).map((s: any) => ({ id: s.id, name: s.name, duration_min: s.default_duration_min ?? null, requiresSurvey: s.requires_survey ?? false, followUpCount: s.follow_up_count ?? 2 }))}
         companyId={companyId}
         mapboxToken={mapboxToken}
         initialView={view as "week" | "month" | "map"}

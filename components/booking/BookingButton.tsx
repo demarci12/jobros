@@ -6,7 +6,7 @@ import { CalendarPlus } from "lucide-react";
 import { BookingDropup } from "./BookingDropup";
 
 type Site = { id: string; address: string; city: string | null };
-type Service = { id: string; name: string; duration_min: number | null };
+type Service = { id: string; name: string; duration_min: number | null; requiresSurvey: boolean; followUpCount: number };
 type Technician = { id: string; name: string };
 type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
 type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };

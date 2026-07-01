@@ -15,7 +15,7 @@ import { toast } from "sonner";
 
 type Service = {
   id: string; name: string; activity: string; default_duration_min: number;
-  requires_survey: boolean; default_price: number | null; vat_rate: number;
+  requires_survey: boolean; follow_up_count: number; default_price: number | null; vat_rate: number;
   color: string | null; is_active: boolean; sort_order: number;
   default_quote_template_id: string | null;
   default_worksheet_template_id: string | null;
@@ -137,6 +137,11 @@ function ServiceForm({
           Előzetes felmérés szükséges
         </label>
       </div>
+      <div className="space-y-1 max-w-xs">
+        <Label htmlFor="follow_up_count">Követő látogatások száma</Label>
+        <Input id="follow_up_count" name="follow_up_count" type="number" min={0} max={10}
+          defaultValue={service?.follow_up_count ?? 2} />
+      </div>
       <div className="flex gap-2">
         <Button type="submit" disabled={isPending}>{service ? "Mentés" : "Létrehozás"}</Button>
         <Button type="button" variant="outline" onClick={onDone}>Mégsem</Button>
@@ -210,6 +215,7 @@ export function ServicesClient({
                       <span className="font-medium text-sm">{s.name}</span>
                       <Badge variant="secondary" className="text-xs">{ACTIVITY_LABELS[s.activity] ?? s.activity}</Badge>
                       {s.requires_survey && <Badge variant="outline" className="text-xs">Felmérés</Badge>}
+                      <Badge variant="outline" className="text-xs">Követés: {s.follow_up_count}</Badge>
                       {!s.is_active && <Badge variant="secondary" className="text-xs">Inaktív</Badge>}
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">

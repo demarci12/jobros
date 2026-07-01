@@ -46,7 +46,7 @@ export default async function CustomerPage({ params }: { params: { id: string } 
           .in("site_id", siteIds)
           .order("created_at")
       : Promise.resolve({ data: [] as any[] }),
-    supabase.from("services").select("id, name, default_duration_min").eq("company_id", companyId).eq("is_active", true).order("sort_order"),
+    supabase.from("services").select("id, name, default_duration_min, requires_survey, follow_up_count").eq("company_id", companyId).eq("is_active", true).order("sort_order"),
     supabase.from("company_users").select("user_id, profiles(id, full_name)").eq("company_id", companyId).eq("role", "technician").eq("is_active", true),
     supabase.from("companies").select("booking_mode, default_slot_duration_min, working_hours").eq("id", companyId).single(),
     supabase.from("appointments").select("starts_at, ends_at, technician_id").eq("company_id", companyId).gte("starts_at", new Date().toISOString()).lte("starts_at", in90Days).neq("status", "lemondva"),
@@ -75,7 +75,7 @@ export default async function CustomerPage({ params }: { params: { id: string } 
             customerId={params.id}
             customerName={customer.name}
             sites={(sites ?? []).map(s => ({ id: s.id, address: s.address, city: s.city ?? null, zip: s.zip ?? null }))}
-            services={(services ?? []).map((s: any) => ({ id: s.id, name: s.name, duration_min: s.default_duration_min ?? null }))}
+            services={(services ?? []).map((s: any) => ({ id: s.id, name: s.name, duration_min: s.default_duration_min ?? null, requiresSurvey: s.requires_survey ?? false, followUpCount: s.follow_up_count ?? 2 }))}
             technicians={techList}
             equipment={(equipment ?? []).map((e: any) => ({ id: e.id, manufacturer: e.manufacturer, model: e.model ?? null, kind: e.kind, site_id: e.site_id ?? null }))}
             existingAppointments={(upcomingAppts ?? []) as any}

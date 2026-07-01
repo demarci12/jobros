@@ -29,7 +29,7 @@ export default async function JobOverviewPage({ params }: { params: { id: string
       id, description, created_at, equipment_id, status,
       customers(id, name, phone, email),
       sites(id, address, city),
-      services(name)
+      services(name, requires_survey, follow_up_count)
     `)
     .eq("id", params.id)
     .eq("company_id", companyId)
@@ -148,6 +148,11 @@ export default async function JobOverviewPage({ params }: { params: { id: string
               jobId={params.id}
               technicians={techList}
               existingAppointments={(upcomingAppts ?? []) as any}
+              jobAppointments={(appointments ?? []).map((a: any) => ({ kind: a.kind }))}
+              service={(job as any).services ? {
+                requires_survey: (job as any).services.requires_survey ?? false,
+                follow_up_count: (job as any).services.follow_up_count ?? 2,
+              } : null}
               defaultSlotDurationMin={company?.default_slot_duration_min ?? 120}
               workingHours={(company?.working_hours as typeof defaultHours) ?? defaultHours}
               hasAppointments={hasAppointments}
