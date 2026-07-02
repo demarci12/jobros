@@ -32,7 +32,10 @@ export async function resolveConnector<T extends Connector>(
   if (!match) return null;
 
   const factory = PROVIDER_MAP[match.app_slug];
-  if (!factory) return null;
+  if (!factory) {
+    console.error(`resolveConnector: "${match.app_slug}" is installed for company ${companyId} but has no PROVIDER_MAP entry — no connector implementation exists yet.`);
+    return null;
+  }
 
   const apiKey = match.secret_ref ? await getSecret(match.secret_ref) : null;
   if (!apiKey) return null;

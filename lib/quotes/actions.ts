@@ -182,6 +182,49 @@ export async function updateQuoteStatus(quoteId: string, status: string, jobId: 
     }
   }
 
+  // Elfogadott árajánlat esetén a kiválasztott sorok automatikusan bekerülnek
+  // a munkalapba, hogy a szerelőnek ne kelljen ugyanazt kétszer begépelnie.
+  if (newStatus === "accepted" && oldStatus !== "accepted") {
+    const { data: acceptedLines } = await ctx.supabase
+      .from("quote_lines")
+      .select("description, quantity, unit, unit_price, vat_rate, material_id")
+      .eq("quote_id", quoteId)
+      .eq("company_id", ctx.companyId)
+      .eq("is_selected", true);
+
+    if (acceptedLines && acceptedLines.length > 0) {
+      const { data: existingWorksheet } = await ctx.supabase
+        .from("worksheets").select("id")
+        .eq("job_id", jobId).eq("company_id", ctx.companyId).maybeSingle();
+
+      let worksheetId = existingWorksheet?.id as string | undefined;
+      if (!worksheetId) {
+        const { data: newWorksheet } = await ctx.supabase
+          .from("worksheets")
+          .insert({ company_id: ctx.companyId, job_id: jobId })
+          .select("id").single();
+        worksheetId = newWorksheet?.id;
+      }
+
+      if (worksheetId) {
+        await ctx.supabase.from("worksheet_lines").insert(
+          acceptedLines.map(l => ({
+            company_id: ctx.companyId,
+            worksheet_id: worksheetId,
+            description: l.description,
+            quantity: l.quantity,
+            unit: l.unit ?? "db",
+            unit_price: l.unit_price,
+            vat_rate: l.vat_rate,
+            is_labor: false,
+            ...(l.material_id ? { material_id: l.material_id } : {}),
+          }))
+        );
+        revalidatePath(`/jobs/${jobId}/worksheet`);
+      }
+    }
+  }
+
   revalidatePath(`/jobs/${jobId}/quote`);
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/jobs");

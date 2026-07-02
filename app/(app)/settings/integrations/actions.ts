@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { createServiceClient } from "@/lib/supabase/service";
+import { checkEntitlement } from "@/lib/billing/entitlements";
 
 async function getOwnerCtx() {
   const ctx = await getAuthContext();
@@ -15,6 +16,18 @@ export async function installApp(appSlug: string, apiKey: string) {
   if (!ctx) return { error: "Nincs jogosultság." };
 
   const service = createServiceClient();
+
+  // Számlázás mindig elérhető minden csomagon (alapfunkció, NAV-kötelezettség) —
+  // minden más connector-kategória (naptár, fizetés, üzenetküldés) app_store gate mögött van.
+  const { data: appDef } = await service.from("app_definitions").select("category").eq("slug", appSlug).maybeSingle();
+  if (appDef?.category !== "invoicing") {
+    const ent = await checkEntitlement(ctx.companyId, "app_store");
+    if (!ent.allowed) {
+      return { error: ent.reason === "read_only"
+        ? "Az előfizetés lejárt vagy felfüggesztett — csak olvasás engedélyezett."
+        : "Ez a connector nem érhető el az aktuális csomagban." };
+    }
+  }
 
   // Store the API key in Vault
   let secretRef: string | null = null;

@@ -13,6 +13,33 @@ export type EntitlementResult =
   | { allowed: true }
   | { allowed: false; reason: "read_only" | "feature_gate" | "limit_exceeded" | "no_subscription" };
 
+function isSubscriptionReadOnly(status: string, trialEndsAt: string | null): boolean {
+  // past_due / suspended → read-only: csak lekérdezés engedélyezett
+  if (status === "past_due" || status === "suspended") return true;
+  // trialing: ellenőrizzük, hogy nem járt-e le a trial
+  if (status === "trialing" && trialEndsAt && new Date(trialEndsAt) < new Date()) return true;
+  return false;
+}
+
+/**
+ * Csak az előfizetés-státuszt ellenőrzi (past_due/suspended/lejárt trial),
+ * feature- és limit-kulcs nélkül. Mutáló Server Actionöknél használandó
+ * ott, ahol nincs értelmes feature/limit kulcs, de a read-only szabályt
+ * akkor is be kell tartani.
+ */
+export async function checkSubscriptionActive(companyId: string): Promise<EntitlementResult> {
+  const service = createServiceClient();
+  const { data: sub } = await service
+    .from("subscriptions")
+    .select("status, trial_ends_at")
+    .eq("company_id", companyId)
+    .maybeSingle();
+
+  if (!sub) return { allowed: false, reason: "no_subscription" };
+  if (isSubscriptionReadOnly(sub.status, sub.trial_ends_at)) return { allowed: false, reason: "read_only" };
+  return { allowed: true };
+}
+
 /**
  * Ellenőrzi, hogy egy company jogosult-e az adott funkcióra / limitre.
  *
@@ -41,17 +68,8 @@ export async function checkEntitlement(
 
   if (!sub) return { allowed: false, reason: "no_subscription" };
 
-  // past_due / suspended → read-only: csak lekérdezés engedélyezett
-  if (sub.status === "past_due" || sub.status === "suspended") {
-    return { allowed: false, reason: "read_only" };
-  }
-
-  // trialing: ellenőrizzük, hogy nem járt-e le a trial
-  if (sub.status === "trialing" && sub.trial_ends_at) {
-    if (new Date(sub.trial_ends_at) < new Date()) {
-      return { allowed: false, reason: "read_only" };
-    }
-  }
+  const readOnly = isSubscriptionReadOnly(sub.status, sub.trial_ends_at);
+  if (readOnly) return { allowed: false, reason: "read_only" };
 
   const rawPlan = Array.isArray(sub.plan_definitions)
     ? sub.plan_definitions[0]

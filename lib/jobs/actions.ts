@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { getAuthContext } from "@/lib/supabase/auth-context";
 import { assertTransition, type JobStatus } from "./status-machine";
-import { checkEntitlement } from "@/lib/billing/entitlements";
+import { checkEntitlement, checkSubscriptionActive } from "@/lib/billing/entitlements";
 import { generateJobNumber } from "./job-number";
 
 async function getJobCtx(roles = ["owner", "dispatcher", "technician"] as string[]) {
@@ -62,6 +62,10 @@ export async function createJob(formData: FormData) {
 export async function updateJob(jobId: string, formData: FormData) {
   const ctx = await getJobCtx(["owner", "dispatcher"]);
   if (!ctx) return { error: "Nincs jogosultság." };
+  const ent = await checkSubscriptionActive(ctx.companyId);
+  if (!ent.allowed && ent.reason === "read_only") {
+    return { error: "Az előfizetés lejárt vagy felfüggesztett — csak olvasás engedélyezett." };
+  }
 
   const parsed = createJobSchema.partial().safeParse({
     service_id: formData.get("service_id") || null,
@@ -84,6 +88,10 @@ export async function updateJob(jobId: string, formData: FormData) {
 export async function transitionJob(jobId: string, toStatus: JobStatus) {
   const ctx = await getJobCtx();
   if (!ctx) return { error: "Nincs jogosultság." };
+  const ent = await checkSubscriptionActive(ctx.companyId);
+  if (!ent.allowed && ent.reason === "read_only") {
+    return { error: "Az előfizetés lejárt vagy felfüggesztett — csak olvasás engedélyezett." };
+  }
 
   const { data: job } = await ctx.supabase
     .from("jobs").select("status, assigned_to, company_id")
