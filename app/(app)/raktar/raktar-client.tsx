@@ -276,43 +276,68 @@ export function RaktarClient({
 
       {/* Mozgásnapló */}
       {tab === "mozgasok" && (
-        <div className="rounded-lg border overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-muted text-muted-foreground text-xs uppercase">
-              <tr>
-                <th className="px-3 py-2 text-left">Anyag</th>
-                <th className="px-3 py-2 text-right">Mennyiség</th>
-                <th className="px-3 py-2 text-left hidden sm:table-cell">Ok</th>
-                <th className="px-3 py-2 text-left hidden sm:table-cell">Munka</th>
-                <th className="px-3 py-2 text-left">Dátum</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {movements.map(mv => (
-                <tr key={mv.id} className="hover:bg-muted/40">
-                  <td className="px-3 py-2 font-medium">{mv.materials?.name ?? "—"}</td>
-                  <td className={`px-3 py-2 text-right font-semibold ${mv.quantity > 0 ? "text-green-700" : "text-orange-600"}`}>
-                    {mv.quantity > 0 ? "+" : ""}{mv.quantity} {mv.materials?.unit ?? ""}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">{mv.reason ?? "—"}</td>
-                  <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
-                    {mv.jobs?.job_number ?? "—"}
-                  </td>
-                  <td className="px-3 py-2 text-muted-foreground text-xs">
-                    {new Date(mv.created_at).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}
-                  </td>
-                </tr>
-              ))}
-              {movements.length === 0 && (
+        <>
+          {/* Desktop tábla */}
+          <div className="hidden md:block rounded-lg border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-muted text-muted-foreground text-xs uppercase">
                 <tr>
-                  <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                    Még nincs készletmozgás.
-                  </td>
+                  <th className="px-3 py-2 text-left">Anyag</th>
+                  <th className="px-3 py-2 text-right">Mennyiség</th>
+                  <th className="px-3 py-2 text-left hidden sm:table-cell">Ok</th>
+                  <th className="px-3 py-2 text-left hidden sm:table-cell">Munka</th>
+                  <th className="px-3 py-2 text-left">Dátum</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y">
+                {movements.map(mv => (
+                  <tr key={mv.id} className="hover:bg-muted/40">
+                    <td className="px-3 py-2 font-medium">{mv.materials?.name ?? "—"}</td>
+                    <td className={`px-3 py-2 text-right font-semibold ${mv.quantity > 0 ? "text-green-700" : "text-orange-600"}`}>
+                      {mv.quantity > 0 ? "+" : ""}{mv.quantity} {mv.materials?.unit ?? ""}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">{mv.reason ?? "—"}</td>
+                    <td className="px-3 py-2 text-muted-foreground hidden sm:table-cell">
+                      {mv.jobs?.job_number ?? "—"}
+                    </td>
+                    <td className="px-3 py-2 text-muted-foreground text-xs">
+                      {new Date(mv.created_at).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}
+                    </td>
+                  </tr>
+                ))}
+                {movements.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                      Még nincs készletmozgás.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobil kártyák */}
+          <div className="md:hidden space-y-2">
+            {movements.map(mv => (
+              <div key={mv.id} className="rounded-lg border p-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="font-medium text-sm truncate">{mv.materials?.name ?? "—"}</p>
+                  <span className={`font-semibold text-sm shrink-0 ${mv.quantity > 0 ? "text-green-700" : "text-orange-600"}`}>
+                    {mv.quantity > 0 ? "+" : ""}{mv.quantity} {mv.materials?.unit ?? ""}
+                  </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                  {mv.reason && <span>{mv.reason}</span>}
+                  {mv.jobs?.job_number && <span>Munka: {mv.jobs.job_number}</span>}
+                  <span>{new Date(mv.created_at).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}</span>
+                </div>
+              </div>
+            ))}
+            {movements.length === 0 && (
+              <p className="text-sm text-center text-muted-foreground py-8">Még nincs készletmozgás.</p>
+            )}
+          </div>
+        </>
       )}
 
       {adjustTarget && (

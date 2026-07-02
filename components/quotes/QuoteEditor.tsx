@@ -257,7 +257,8 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true, quoteTemplate
                 {OPTION_LABELS[group] ?? group}
               </h3>
             )}
-            <div className="rounded-lg border overflow-x-auto">
+            {/* Table — desktop/tablet */}
+            <div className="hidden sm:block rounded-lg border overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b bg-muted/50 text-xs text-muted-foreground">
@@ -299,6 +300,38 @@ export function QuoteEditor({ jobId, initialQuote, canEdit = true, quoteTemplate
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            {/* Cards — mobile */}
+            <div className="sm:hidden space-y-2">
+              {groupLines.map(l => (
+                <div key={l.id} className={`rounded-lg border p-3 space-y-1.5 ${l.is_optional && !l.is_selected ? "opacity-50" : ""}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      {l.is_optional && canEdit && (
+                        <input type="checkbox" checked={l.is_selected} onChange={() => handleToggle(l.id, l.is_selected)}
+                          className="h-4 w-4 mt-0.5 accent-foreground shrink-0" />
+                      )}
+                      <p className="text-sm font-medium">
+                        {l.description}
+                        {l.is_optional && <span className="ml-1 text-xs font-normal text-muted-foreground">(opcionális)</span>}
+                      </p>
+                    </div>
+                    {canEdit && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7 -mr-1.5 -mt-1 shrink-0 text-muted-foreground hover:text-destructive"
+                        disabled={isPending} onClick={() => handleDelete(l.id)}>
+                        <Trash2 size={13} />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                    <div>Menny.: <span className="text-foreground">{l.quantity} {l.unit}</span></div>
+                    <div>ÁFA: <span className="text-foreground">{l.vat_rate}%</span></div>
+                    <div>Egységár: <span className="text-foreground">{l.unit_price.toLocaleString("hu-HU")} Ft</span></div>
+                    <div>Nettó: <span className="text-foreground font-medium">{l.line_total.toLocaleString("hu-HU")} Ft</span></div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );

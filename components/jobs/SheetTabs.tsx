@@ -30,7 +30,7 @@ export function SheetTabs({ jobId, status }: { jobId: string; status: JobStatus 
           <Link key={tab.key} href={isLocked ? "#" : href}
             aria-disabled={isLocked}
             title={isLocked ? "A munka lezárása után válik aktívvá" : undefined}
-            className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${
+            className={`shrink-0 px-3.5 sm:px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition-colors ${
               isActive
                 ? "border-foreground font-semibold text-foreground"
                 : isLocked

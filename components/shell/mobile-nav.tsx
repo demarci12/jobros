@@ -9,25 +9,37 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Menu } from "lucide-react";
 import { useState, useEffect } from "react";
 
-export function MobileNav() {
-  const [open, setOpen] = useState(false);
+interface MobileNavProps {
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}
+
+export function MobileNav({ open: openProp, onOpenChange, hideTrigger }: MobileNavProps = {}) {
+  const [openState, setOpenState] = useState(false);
   const pathname = usePathname();
+
+  const open = openProp ?? openState;
+  const setOpen = onOpenChange ?? setOpenState;
 
   useEffect(() => {
     setOpen(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname]);
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="lg:hidden"
-        onClick={() => setOpen(true)}
-        aria-label="Menü megnyitása"
-      >
-        <Menu size={20} />
-      </Button>
+      {!hideTrigger && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="lg:hidden"
+          onClick={() => setOpen(true)}
+          aria-label="Menü megnyitása"
+        >
+          <Menu size={20} />
+        </Button>
+      )}
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">

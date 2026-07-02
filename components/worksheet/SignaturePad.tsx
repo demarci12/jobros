@@ -127,9 +127,8 @@ export function SignaturePad({
       </div>
 
       <div className="relative">
-        <canvas ref={canvasRef} width={600} height={200}
-          className="w-full rounded-lg border bg-white touch-none cursor-crosshair"
-          style={{ maxHeight: 200 }}
+        <canvas ref={canvasRef} width={600} height={220}
+          className="w-full h-[220px] sm:h-[200px] rounded-lg border bg-white touch-none cursor-crosshair"
           onMouseDown={startDraw} onMouseMove={draw} onMouseUp={endDraw} onMouseLeave={endDraw}
           onTouchStart={startDraw} onTouchMove={draw} onTouchEnd={endDraw} />
         {!hasStrokes && (

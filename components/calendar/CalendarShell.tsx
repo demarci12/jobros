@@ -104,11 +104,11 @@ export function CalendarShell({
   return (
     <div className="flex flex-col h-full gap-3">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <h1 className="text-xl font-semibold">Naptár</h1>
+      <div className="flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <h1 className="text-lg sm:text-xl font-semibold">Naptár</h1>
           <Button size="sm" onClick={() => setBookingOpen(true)}>
-            <CalendarPlus size={14} className="mr-1.5" /> Új foglalás
+            <CalendarPlus size={14} className="sm:mr-1.5" /> <span className="hidden sm:inline">Új foglalás</span>
           </Button>
         </div>
 
@@ -117,7 +117,7 @@ export function CalendarShell({
           {view === "month" && (
             <div className="flex items-center gap-1">
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => changeMonth(-1)}>‹</Button>
-              <span className="text-sm font-medium min-w-[130px] text-center">
+              <span className="text-xs sm:text-sm font-medium min-w-[100px] sm:min-w-[130px] text-center">
                 {month.getFullYear()}. {HU_MONTHS[month.getMonth()]}
               </span>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => changeMonth(1)}>›</Button>
@@ -128,24 +128,27 @@ export function CalendarShell({
           <div className="flex rounded-md border overflow-hidden">
             <Button
               size="sm" variant={view === "week" ? "default" : "ghost"}
-              className="rounded-none border-0 h-8 px-3"
+              className="rounded-none border-0 h-8 px-2 sm:px-3"
               onClick={() => switchView("week")}
+              title="Hét"
             >
-              <CalendarDays size={14} className="mr-1" /> Hét
+              <CalendarDays size={14} className="sm:mr-1" /> <span className="hidden sm:inline">Hét</span>
             </Button>
             <Button
               size="sm" variant={view === "month" ? "default" : "ghost"}
-              className="rounded-none border-0 border-x h-8 px-3"
+              className="rounded-none border-0 border-x h-8 px-2 sm:px-3"
               onClick={() => switchView("month")}
+              title="Hó"
             >
-              <CalendarRange size={14} className="mr-1" /> Hó
+              <CalendarRange size={14} className="sm:mr-1" /> <span className="hidden sm:inline">Hó</span>
             </Button>
             <Button
               size="sm" variant={view === "map" ? "default" : "ghost"}
-              className="rounded-none border-0 h-8 px-3"
+              className="rounded-none border-0 h-8 px-2 sm:px-3"
               onClick={() => switchView("map")}
+              title="Térkép"
             >
-              <Map size={14} className="mr-1" /> Térkép
+              <Map size={14} className="sm:mr-1" /> <span className="hidden sm:inline">Térkép</span>
             </Button>
           </div>
         </div>

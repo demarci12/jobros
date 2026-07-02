@@ -148,7 +148,7 @@ export function MonthView({
         </div>
 
         {/* 6 weeks */}
-        <div className="grid grid-cols-7 flex-1" style={{ gridAutoRows: "minmax(90px, 1fr)" }}>
+        <div className="grid grid-cols-7 flex-1 auto-rows-[64px] sm:auto-rows-[90px]">
           {days.map(day => {
             const key = isoDate(day);
             const isThisMonth = day.getMonth() === month.getMonth();
@@ -160,7 +160,7 @@ export function MonthView({
                 key={key}
                 id={key}
                 className={cn(
-                  "border-b border-r p-1 flex flex-col gap-0.5 min-h-[90px] transition-colors",
+                  "border-b border-r p-1 flex flex-col gap-0.5 min-h-[64px] sm:min-h-[90px] transition-colors",
                   !isThisMonth && "bg-muted/30",
                 )}
               >

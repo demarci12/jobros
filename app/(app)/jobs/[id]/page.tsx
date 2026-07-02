@@ -163,13 +163,13 @@ export default async function JobOverviewPage({ params }: { params: { id: string
         {hasAppointments ? (
           <ul className="space-y-1">
             {(appointments ?? []).map((a: any) => (
-              <li key={a.id} className="flex items-center gap-3 text-sm border rounded-md px-3 py-2">
+              <li key={a.id} className="flex items-center gap-2 sm:gap-3 text-sm border rounded-md px-3 py-2 flex-wrap">
                 <Calendar size={13} className="text-muted-foreground shrink-0" />
-                <span>{a.kind === "felmeres" ? "Felmérés" : "Munka"}</span>
-                <span className="text-muted-foreground">
+                <span className="shrink-0">{a.kind === "felmeres" ? "Felmérés" : "Munka"}</span>
+                <span className="text-muted-foreground text-xs sm:text-sm">
                   {new Date(a.starts_at).toLocaleString("hu-HU", { dateStyle: "short", timeStyle: "short" })}
                 </span>
-                <Badge variant="outline" className="text-xs ml-auto">{a.status}</Badge>
+                <Badge variant="outline" className="text-xs ml-auto shrink-0">{a.status}</Badge>
               </li>
             ))}
           </ul>

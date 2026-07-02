@@ -63,8 +63,9 @@ export function PhotoUpload({
               )}
               <button
                 onClick={() => handleDelete(a.id)}
-                className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                <X size={12} />
+                aria-label="Fotó törlése"
+                className="absolute top-1 right-1 bg-black/60 text-white rounded-full p-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                <X size={14} />
               </button>
             </div>
           ))}

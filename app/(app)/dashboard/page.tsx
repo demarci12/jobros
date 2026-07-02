@@ -6,8 +6,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 function KpiSkeleton() {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {[...Array(4)].map((_, i) => (
+    <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+      {[...Array(3)].map((_, i) => (
         <div key={i} className="rounded-lg border p-4 space-y-2">
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-8 w-32" />

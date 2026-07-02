@@ -75,6 +75,14 @@ export function DispatchCalendar({
 }) {
   const [viewMode, setViewMode] = useState<"day" | "week">("week");
   const [pivotDate, setPivotDate] = useState(() => { const d = new Date(); d.setHours(0,0,0,0); return d; });
+
+  // Default to single-day view on narrow (mobile) screens — the week grid
+  // needs horizontal scroll room per technician column that a phone doesn't have.
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 640) {
+      setViewMode("day");
+    }
+  }, []);
   const [appointments, setAppointments] = useState<Appointment[]>(initialAppointments);
   const [activeAppt, setActiveAppt] = useState<Appointment | null>(null);
   // "all" or a specific technician id
