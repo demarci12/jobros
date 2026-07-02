@@ -23,7 +23,7 @@ type Site = { id: string; address: string; city: string | null; zip?: string | n
 type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
 type Technician = { id: string; name: string };
 type Appointment = { starts_at: string; ends_at: string; technician_id: string | null };
-type Setup = { siteId: string; serviceId: string; equipmentId: string; title: string; kind: "felmeres" | "munka" | "kovetes" };
+type Setup = { siteId: string; serviceId: string; equipmentIds: string[]; title: string; kind: "felmeres" | "munka" | "kovetes" };
 
 const DEFAULT_WORKING_HOURS = {
   mon: { open: true, start: "08:00", end: "17:00" },
@@ -161,7 +161,7 @@ export function PhoneIntakeDialog({ fullWidth }: { fullWidth?: boolean }) {
         customerId: selectedCustomer.id,
         siteId: setup.siteId,
         serviceId: setup.serviceId,
-        equipmentId: setup.equipmentId,
+        equipmentIds: setup.equipmentIds,
         title: setup.title || selectedService?.name || null,
         kind: setup.kind,
         technicianId,

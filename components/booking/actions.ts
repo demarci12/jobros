@@ -9,7 +9,7 @@ const CreateBookingSchema = z.object({
   customerId: z.string().uuid(),
   siteId: z.string().uuid(),
   serviceId: z.string().uuid(),
-  equipmentId: z.string().uuid(),
+  equipmentIds: z.array(z.string().uuid()).default([]),
   title: z.string().max(255).nullable(),
   kind: z.enum(["munka", "felmeres", "kovetes"]),
   technicianId: z.string().uuid().nullable(),
@@ -20,7 +20,7 @@ const CreateBookingSchema = z.object({
 export async function createBooking(input: z.infer<typeof CreateBookingSchema>) {
   const parsed = CreateBookingSchema.safeParse(input);
   if (!parsed.success) return { error: "Érvénytelen adatok: " + parsed.error.issues[0]?.message };
-  const { customerId, siteId, serviceId, equipmentId, kind, technicianId, startsAt, endsAt } = parsed.data;
+  const { customerId, siteId, serviceId, equipmentIds, kind, technicianId, startsAt, endsAt } = parsed.data;
   // Generate a fallback title so jobs are always identifiable
   const title = parsed.data.title || null;
 
@@ -61,7 +61,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       p_customer_id: customerId,
       p_site_id: siteId,
       p_service_id: serviceId ?? null,
-      p_equipment_id: equipmentId ?? null,
+      p_equipment_ids: equipmentIds,
       p_title: title,
       p_assigned_to: technicianId ?? null,
       p_created_by: user.id,

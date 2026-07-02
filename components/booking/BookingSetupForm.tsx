@@ -27,17 +27,17 @@ export function BookingSetupForm({
   equipment: Equipment[];
   onCancel?: () => void;
   onBack?: () => void;
-  onSubmit: (v: { siteId: string; serviceId: string; equipmentId: string; title: string; kind: "felmeres" | "munka" | "kovetes" }) => void;
+  onSubmit: (v: { siteId: string; serviceId: string; equipmentIds: string[]; title: string; kind: "felmeres" | "munka" | "kovetes" }) => void;
 }) {
   const [siteId, setSiteId] = useState(sites[0]?.id ?? "");
   const [serviceId, setServiceId] = useState(services[0]?.id ?? "");
-  const [equipmentId, setEquipmentId] = useState("");
+  const [equipmentIds, setEquipmentIds] = useState<string[]>([]);
   const [title, setTitle] = useState("");
 
   useEffect(() => {
     setSiteId(sites[0]?.id ?? "");
     setServiceId(services[0]?.id ?? "");
-    setEquipmentId("");
+    setEquipmentIds([]);
     setTitle("");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -47,14 +47,16 @@ export function BookingSetupForm({
   const siteLabel = selectedSite ? [selectedSite.zip, selectedSite.address, selectedSite.city].filter(Boolean).join(", ") : undefined;
   const selectedService = services.find(s => s.id === serviceId);
   const serviceLabel = selectedService ? `${selectedService.name}${selectedService.duration_min ? ` — ${selectedService.duration_min} perc` : ""}` : undefined;
-  const selectedEquipment = siteEquipment.find(e => e.id === equipmentId);
-  const equipmentLabel = selectedEquipment ? `${selectedEquipment.manufacturer}${selectedEquipment.model ? ` ${selectedEquipment.model}` : ""} (${selectedEquipment.kind})` : undefined;
+
+  function toggleEquipment(id: string) {
+    setEquipmentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
 
   const nextKind = selectedService
     ? getNextAppointmentKind({ requires_survey: selectedService.requiresSurvey, follow_up_count: selectedService.followUpCount }, [])
     : "munka";
 
-  const canProceed = !!siteId && !!serviceId && !!equipmentId;
+  const canProceed = !!siteId && !!serviceId;
 
   return (
     <div className="space-y-5">
@@ -66,7 +68,7 @@ export function BookingSetupForm({
             Ehhez az ügyfélhez nincs rögzített cím. Az ügyfél profiljánál add hozzá először.
           </p>
         ) : (
-          <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentId(""); }}>
+          <Select value={siteId} onValueChange={v => { setSiteId(v ?? ""); setEquipmentIds([]); }}>
             <SelectTrigger><SelectValue placeholder="Válassz helyszínt…">{siteLabel}</SelectValue></SelectTrigger>
             <SelectContent>
               {sites.map(s => (
@@ -111,22 +113,25 @@ export function BookingSetupForm({
         )}
 
         <div className="space-y-1.5">
-          <Label>Berendezés *</Label>
+          <Label>Berendezés (opcionális)</Label>
           {siteEquipment.length === 0 ? (
             <p className="text-xs text-muted-foreground pt-1">
-              Ehhez a helyszínhez nincs rögzített berendezés. Az ügyfél profiljánál add hozzá először.
+              Ehhez a helyszínhez nincs rögzített berendezés.
             </p>
           ) : (
-            <Select value={equipmentId} onValueChange={v => setEquipmentId(v ?? "")}>
-              <SelectTrigger><SelectValue placeholder="Válassz berendezést…">{equipmentLabel}</SelectValue></SelectTrigger>
-              <SelectContent>
-                {siteEquipment.map(e => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="rounded-md border divide-y">
+              {siteEquipment.map(e => (
+                <label key={e.id} className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-muted/40">
+                  <input
+                    type="checkbox"
+                    className="rounded"
+                    checked={equipmentIds.includes(e.id)}
+                    onChange={() => toggleEquipment(e.id)}
+                  />
+                  <span>{e.manufacturer}{e.model ? ` ${e.model}` : ""} ({e.kind})</span>
+                </label>
+              ))}
+            </div>
           )}
         </div>
 
@@ -146,7 +151,7 @@ export function BookingSetupForm({
           {onCancel && <Button variant="outline" onClick={onCancel}>Mégsem</Button>}
           <Button
             disabled={!canProceed}
-            onClick={() => onSubmit({ siteId, serviceId, equipmentId, title, kind: nextKind })}
+            onClick={() => onSubmit({ siteId, serviceId, equipmentIds, title, kind: nextKind })}
           >
             Időpont választása →
           </Button>

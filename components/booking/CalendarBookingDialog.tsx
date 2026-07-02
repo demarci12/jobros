@@ -47,7 +47,7 @@ export function CalendarBookingDialog({
   const [sites, setSites] = useState<Site[]>([]);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
-  const [setup, setSetup] = useState<{ siteId: string; serviceId: string; equipmentId: string; title: string; kind: "felmeres" | "munka" | "kovetes" } | null>(null);
+  const [setup, setSetup] = useState<{ siteId: string; serviceId: string; equipmentIds: string[]; title: string; kind: "felmeres" | "munka" | "kovetes" } | null>(null);
   const [isPending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -94,7 +94,7 @@ export function CalendarBookingDialog({
         customerId: customer.id,
         siteId: setup.siteId,
         serviceId: setup.serviceId,
-        equipmentId: setup.equipmentId,
+        equipmentIds: setup.equipmentIds,
         title: setup.title || selectedService?.name || null,
         kind: setup.kind,
         technicianId,

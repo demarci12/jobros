@@ -47,7 +47,7 @@ export function BookingDropup({
 }) {
   const router = useRouter();
   const [step, setStep] = useState<"setup" | "slot">("setup");
-  const [setup, setSetup] = useState<{ siteId: string; serviceId: string; equipmentId: string; title: string; kind: "felmeres" | "munka" | "kovetes" } | null>(null);
+  const [setup, setSetup] = useState<{ siteId: string; serviceId: string; equipmentIds: string[]; title: string; kind: "felmeres" | "munka" | "kovetes" } | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Reset when reopened
@@ -68,7 +68,7 @@ export function BookingDropup({
         customerId,
         siteId: setup.siteId,
         serviceId: setup.serviceId,
-        equipmentId: setup.equipmentId,
+        equipmentIds: setup.equipmentIds,
         title: setup.title || selectedService?.name || null,
         kind: setup.kind,
         technicianId,
