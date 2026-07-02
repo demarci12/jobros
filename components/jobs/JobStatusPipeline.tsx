@@ -5,7 +5,10 @@ import { transitionJob } from "@/lib/jobs/actions";
 import { canTransition, STATUS_LABELS, type JobStatus } from "@/lib/jobs/status-machine";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ChevronRight } from "lucide-react";
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 import { toast } from "sonner";
 
 const STATUS_VARIANT: Record<JobStatus, "default" | "secondary" | "outline" | "destructive"> = {
@@ -41,6 +44,10 @@ export function JobStatusPipeline({ jobId, currentStatus, canEdit, assignedTo, c
   const forwardNext = FORWARD_STATUSES.filter(s => canTransition(status, s));
   const cancelNext  = CANCEL_STATUSES.filter(s => canTransition(status, s));
 
+  // Az elsőként elérhető, pipeline-sorrend szerinti következő státusz — ez a "könnyed léptetés" gomb.
+  const primaryNext = forwardNext[0];
+  const otherOptions = [...forwardNext.slice(1), ...cancelNext];
+
   function handleTransition(to: JobStatus) {
     const prev = status;
     setStatus(to);
@@ -61,29 +68,35 @@ export function JobStatusPipeline({ jobId, currentStatus, canEdit, assignedTo, c
         {STATUS_LABELS[status]}
       </Badge>
 
-      {canAct && forwardNext.length > 0 && (
-        <div className="flex items-center gap-1">
-          {forwardNext.map(to => (
-            <Button key={to} size="sm" variant="ghost"
-              className="h-6 px-2 text-xs gap-0.5 text-muted-foreground hover:text-foreground"
-              disabled={isPending} onClick={() => handleTransition(to)}>
-              <ChevronRight size={12} />
-              {STATUS_LABELS[to]}
-            </Button>
-          ))}
-        </div>
+      {canAct && primaryNext && (
+        <Button size="sm" className="h-7 px-2.5 text-xs gap-1"
+          disabled={isPending} onClick={() => handleTransition(primaryNext)}>
+          {STATUS_LABELS[primaryNext]}
+          <ChevronRight size={13} />
+        </Button>
       )}
 
-      {canAct && cancelNext.length > 0 && (
-        <div className="flex items-center gap-1">
-          {cancelNext.map(to => (
-            <Button key={to} size="sm" variant="ghost"
-              className="h-6 px-2 text-xs text-destructive/70 hover:text-destructive"
-              disabled={isPending} onClick={() => handleTransition(to)}>
-              {STATUS_LABELS[to]}
-            </Button>
-          ))}
-        </div>
+      {canAct && otherOptions.length > 0 && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50"
+            disabled={isPending}
+            aria-label="További státuszok"
+          >
+            <MoreHorizontal size={14} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            {otherOptions.map(to => (
+              <DropdownMenuItem
+                key={to}
+                className={CANCEL_STATUSES.includes(to) ? "text-destructive focus:text-destructive" : ""}
+                onClick={() => handleTransition(to)}
+              >
+                {STATUS_LABELS[to]}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
     </div>
   );

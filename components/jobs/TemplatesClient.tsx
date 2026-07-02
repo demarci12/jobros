@@ -23,7 +23,7 @@ const ACTIVITY_LABELS: Record<string, string> = {
 
 type ChecklistItem = { id?: string; label: string; is_required: boolean; sort_order: number };
 type LineItem = { description: string; quantity: number; unit: string; unit_price: number; vat_rate: number };
-type TemplateKind = "checklist" | "quote" | "worksheet";
+type TemplateKind = "quote" | "worksheet";
 
 type Template = {
   id: string;
@@ -35,7 +35,7 @@ type Template = {
 };
 
 const EMPTY_CHECKLIST_FORM = {
-  name: "", activity: "szerviz", template_kind: "checklist" as TemplateKind,
+  name: "", activity: "szerviz", template_kind: "worksheet" as TemplateKind,
   items: [] as ChecklistItem[], default_lines: [] as LineItem[],
 };
 
@@ -53,7 +53,7 @@ export function TemplatesClient({
   const [templates, setTemplates] = useState<Template[]>(initialTemplates);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Template | null>(null);
-  const [activeKind, setActiveKind] = useState<TemplateKind>("checklist");
+  const [activeKind, setActiveKind] = useState<TemplateKind>("worksheet");
   const [form, setForm] = useState({ ...EMPTY_CHECKLIST_FORM });
   const [newItemLabel, setNewItemLabel] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -185,21 +185,28 @@ export function TemplatesClient({
                   </div>
                 )}
               </CardHeader>
-              <CardContent className="px-4 pb-4 space-y-1">
-                {kind === "checklist" ? (
-                  t.checklist_items.length === 0 ? (
-                    <p className="text-xs text-muted-foreground">Nincs tétel</p>
-                  ) : (
-                    t.checklist_items.slice().sort((a, b) => a.sort_order - b.sort_order).map((it, i) => (
-                      <div key={it.id ?? i} className="flex items-center gap-2 text-xs">
-                        <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-                        <span className="flex-1">{it.label}</span>
-                        {it.is_required && <Badge variant="outline" className="text-[10px] py-0 h-4">kötelező</Badge>}
-                      </div>
-                    ))
-                  )
-                ) : (
-                  (t.default_lines ?? []).length === 0 ? (
+              <CardContent className="px-4 pb-4 space-y-2">
+                {kind === "worksheet" && (
+                  <div className="space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Ellenőrzőlista</p>
+                    {t.checklist_items.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Nincs tétel</p>
+                    ) : (
+                      t.checklist_items.slice().sort((a, b) => a.sort_order - b.sort_order).map((it, i) => (
+                        <div key={it.id ?? i} className="flex items-center gap-2 text-xs">
+                          <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
+                          <span className="flex-1">{it.label}</span>
+                          {it.is_required && <Badge variant="outline" className="text-[10px] py-0 h-4">kötelező</Badge>}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {kind === "worksheet" && (
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Munkalap sorok</p>
+                  )}
+                  {(t.default_lines ?? []).length === 0 ? (
                     <p className="text-xs text-muted-foreground">Nincs sor</p>
                   ) : (
                     (t.default_lines ?? []).slice(0, 3).map((l, i) => (
@@ -209,11 +216,11 @@ export function TemplatesClient({
                         <span className="text-muted-foreground shrink-0">{l.unit_price.toLocaleString("hu-HU")} Ft</span>
                       </div>
                     ))
-                  )
-                )}
-                {kind !== "checklist" && (t.default_lines ?? []).length > 3 && (
-                  <p className="text-xs text-muted-foreground">+{(t.default_lines ?? []).length - 3} sor</p>
-                )}
+                  )}
+                  {(t.default_lines ?? []).length > 3 && (
+                    <p className="text-xs text-muted-foreground">+{(t.default_lines ?? []).length - 3} sor</p>
+                  )}
+                </div>
               </CardContent>
             </Card>
           ))}
@@ -226,18 +233,14 @@ export function TemplatesClient({
     <div className="space-y-4">
       <Tabs value={activeKind} onValueChange={(v) => setActiveKind(v as TemplateKind)}>
         <TabsList>
-          <TabsTrigger value="checklist">Ellenőrzőlista</TabsTrigger>
-          <TabsTrigger value="quote">Árajánlat sablon</TabsTrigger>
           <TabsTrigger value="worksheet">Munkalap sablon</TabsTrigger>
+          <TabsTrigger value="quote">Árajánlat sablon</TabsTrigger>
         </TabsList>
-        <TabsContent value="checklist" className="mt-4">
-          <TemplateGrid kind="checklist" />
+        <TabsContent value="worksheet" className="mt-4">
+          <TemplateGrid kind="worksheet" />
         </TabsContent>
         <TabsContent value="quote" className="mt-4">
           <TemplateGrid kind="quote" />
-        </TabsContent>
-        <TabsContent value="worksheet" className="mt-4">
-          <TemplateGrid kind="worksheet" />
         </TabsContent>
       </Tabs>
 
@@ -271,7 +274,7 @@ export function TemplatesClient({
               </div>
             </div>
 
-            {form.template_kind === "checklist" && (
+            {form.template_kind === "worksheet" && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Ellenőrzőlista tételek</label>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
@@ -311,9 +314,8 @@ export function TemplatesClient({
               </div>
             )}
 
-            {(form.template_kind === "quote" || form.template_kind === "worksheet") && (
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Sablon sorok</label>
+            <div className="space-y-2">
+                <label className="text-sm font-medium">Munkalap sorok</label>
                 {form.default_lines.length > 0 && (
                   <div className="rounded-lg border overflow-x-auto">
                     <table className="w-full text-xs">
@@ -389,7 +391,6 @@ export function TemplatesClient({
                   <Plus size={13} className="mr-1" /> Sor hozzáadása
                 </Button>
               </div>
-            )}
 
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

@@ -26,7 +26,6 @@ export default async function WorksheetPage({ params }: { params: { id: string }
     { data: attachments },
     { data: catalogMaterials },
     { data: checklistItems },
-    { data: checklistTemplates },
     { data: worksheetTemplates },
   ] = await Promise.all([
     supabase.from("worksheets").select("id, work_done")
@@ -41,11 +40,6 @@ export default async function WorksheetPage({ params }: { params: { id: string }
       .select("id, label, is_done, done_at, done_by")
       .eq("job_id", params.id).eq("company_id", companyId)
       .order("created_at"),
-    supabase.from("job_templates")
-      .select("id, name")
-      .eq("company_id", companyId)
-      .eq("template_kind", "checklist")
-      .order("name"),
     supabase.from("job_templates")
       .select("id, name")
       .eq("company_id", companyId)
@@ -64,12 +58,12 @@ export default async function WorksheetPage({ params }: { params: { id: string }
   return (
     <div className="space-y-0 max-w-2xl divide-y">
       {/* Ellenőrzőlista + Elvégzett munka — egy egységes munkalapként */}
-      {(checklistItems ?? []).length > 0 || (checklistTemplates ?? []).length > 0 ? (
+      {(checklistItems ?? []).length > 0 || (worksheetTemplates ?? []).length > 0 ? (
         <div className="pb-6">
           <ChecklistPanel
             jobId={params.id}
             initialItems={(checklistItems ?? []) as any}
-            templates={(checklistTemplates ?? []) as any}
+            templates={(worksheetTemplates ?? []) as any}
             canEdit={canEdit}
           />
         </div>

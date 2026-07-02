@@ -17,7 +17,7 @@ const LineItemSchema = z.object({
 const TemplateSchema = z.object({
   name: z.string().min(1).max(100),
   activity: z.enum(["szerviz", "csere", "telepites", "felmeres", "garancia", "egyeb"]),
-  template_kind: z.enum(["checklist", "quote", "worksheet"]).default("checklist"),
+  template_kind: z.enum(["quote", "worksheet"]).default("worksheet"),
   items: z.array(z.object({
     label: z.string().min(1).max(255),
     is_required: z.boolean().default(false),
@@ -46,12 +46,12 @@ export async function createTemplate(raw: unknown) {
       name,
       activity,
       template_kind,
-      default_lines: template_kind !== "checklist" ? default_lines : [],
+      default_lines,
     })
     .select("id").single();
   if (error) return { error: error.message };
 
-  if (template_kind === "checklist" && items.length > 0) {
+  if (template_kind === "worksheet" && items.length > 0) {
     const { error: ie } = await ctx.supabase
       .from("checklist_items")
       .insert(items.map((it, i) => ({
@@ -81,12 +81,12 @@ export async function updateTemplate(id: string, raw: unknown) {
       name,
       activity,
       template_kind,
-      default_lines: template_kind !== "checklist" ? default_lines : [],
+      default_lines,
     })
     .eq("id", id).eq("company_id", ctx.cu.company_id);
   if (error) return { error: error.message };
 
-  if (template_kind === "checklist") {
+  if (template_kind === "worksheet") {
     // replace all items
     await ctx.supabase.from("checklist_items").delete()
       .eq("template_id", id).eq("company_id", ctx.cu.company_id);
