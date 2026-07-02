@@ -192,13 +192,16 @@ export function TemplatesClient({
                     {t.checklist_items.length === 0 ? (
                       <p className="text-xs text-muted-foreground">Nincs tétel</p>
                     ) : (
-                      t.checklist_items.slice().sort((a, b) => a.sort_order - b.sort_order).map((it, i) => (
+                      t.checklist_items.slice().sort((a, b) => a.sort_order - b.sort_order).slice(0, 3).map((it, i) => (
                         <div key={it.id ?? i} className="flex items-center gap-2 text-xs">
                           <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
                           <span className="flex-1">{it.label}</span>
                           {it.is_required && <Badge variant="outline" className="text-[10px] py-0 h-4">kötelező</Badge>}
                         </div>
                       ))
+                    )}
+                    {t.checklist_items.length > 3 && (
+                      <p className="text-xs text-muted-foreground">+{t.checklist_items.length - 3} tétel</p>
                     )}
                   </div>
                 )}

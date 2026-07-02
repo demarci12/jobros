@@ -65,7 +65,7 @@ export async function createBooking(input: z.infer<typeof CreateBookingSchema>) 
       p_title: title,
       p_assigned_to: technicianId ?? null,
       p_created_by: user.id,
-      p_status: kind === 'felmeres' ? 'felmeres' : 'tervezett',
+      p_status: kind === 'felmeres' ? 'felmeres' : 'utemezve',
       p_kind: kind,
       p_starts_at: startsAt,
       p_ends_at: endsAt,
@@ -176,4 +176,33 @@ export async function getCustomerSitesAndEquipment(customerId: string) {
     : { data: [] as { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null }[] };
 
   return { sites: sites ?? [], equipment: equipment ?? [] };
+}
+
+// Gyors berendezés-felvétel foglaláskor — csak egy típus-megnevezés, a részletek később kitölthetők
+const QuickEquipmentSchema = z.object({
+  siteId: z.string().uuid(),
+  label: z.string().min(1).max(255),
+});
+
+export async function createQuickEquipment(input: z.infer<typeof QuickEquipmentSchema>) {
+  const parsed = QuickEquipmentSchema.safeParse(input);
+  if (!parsed.success) return { error: "Érvénytelen adatok." };
+  const { siteId, label } = parsed.data;
+
+  const ctx = await getAuthContext();
+  if (!ctx || !["owner", "dispatcher"].includes(ctx.role)) return { error: "Nincs jogosultság." };
+  const { supabase, companyId } = ctx;
+
+  const { data: site } = await supabase.from("sites").select("id").eq("id", siteId).eq("company_id", companyId).maybeSingle();
+  if (!site) return { error: "A helyszín nem található." };
+
+  const { data, error } = await supabase.from("equipment").insert({
+    company_id: companyId,
+    site_id: siteId,
+    kind: "klima",
+    model: label,
+  }).select("id, manufacturer, model, kind, site_id").single();
+
+  if (error) return { error: error.message };
+  return { equipment: data };
 }
