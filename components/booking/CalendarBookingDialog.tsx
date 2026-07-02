@@ -5,11 +5,13 @@ import { useRouter } from "next/navigation";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ManualSlotPicker } from "./ManualSlotPicker";
 import { BookingSetupForm } from "./BookingSetupForm";
 import { searchCustomers, getCustomerSitesAndEquipment, createBooking } from "./actions";
+import { createQuickCustomer, searchCustomersByPhone } from "@/lib/crm/actions";
 import { toast } from "sonner";
-import { Search, Loader2 } from "lucide-react";
+import { Search, Loader2, UserPlus, AlertTriangle } from "lucide-react";
 
 type Service = { id: string; name: string; duration_min: number | null; requiresSurvey: boolean; followUpCount: number };
 type Technician = { id: string; name: string };
@@ -19,7 +21,7 @@ type Customer = { id: string; name: string; phone: string | null };
 type Site = { id: string; address: string; city: string | null; zip: string | null };
 type Equipment = { id: string; manufacturer: string; model: string | null; kind: string; site_id: string | null };
 
-type Step = "customer" | "setup" | "slot";
+type Step = "customer" | "new-customer" | "setup" | "slot";
 
 export function CalendarBookingDialog({
   open,
@@ -51,6 +53,14 @@ export function CalendarBookingDialog({
   const [isPending, startTransition] = useTransition();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const [ncName, setNcName] = useState("");
+  const [ncPhone, setNcPhone] = useState("");
+  const [ncEmail, setNcEmail] = useState("");
+  const [ncAddress, setNcAddress] = useState("");
+  const [ncCity, setNcCity] = useState("");
+  const [phoneMatches, setPhoneMatches] = useState<{ id: string; name: string; phone: string | null }[]>([]);
+  const phoneDebounceRef = useRef<ReturnType<typeof setTimeout>>();
+
   useEffect(() => {
     if (!open) {
       setStep("customer");
@@ -60,8 +70,41 @@ export function CalendarBookingDialog({
       setSites([]);
       setEquipment([]);
       setSetup(null);
+      setNcName(""); setNcPhone(""); setNcEmail(""); setNcAddress(""); setNcCity("");
+      setPhoneMatches([]);
     }
   }, [open]);
+
+  useEffect(() => {
+    clearTimeout(phoneDebounceRef.current);
+    if (ncPhone.trim().length < 4) { setPhoneMatches([]); return; }
+    phoneDebounceRef.current = setTimeout(async () => {
+      const res = await searchCustomersByPhone(ncPhone);
+      setPhoneMatches(res);
+    }, 300);
+    return () => clearTimeout(phoneDebounceRef.current);
+  }, [ncPhone]);
+
+  function openNewCustomer() {
+    setNcName(query);
+    setNcPhone(""); setNcEmail(""); setNcAddress(""); setNcCity("");
+    setStep("new-customer");
+  }
+
+  function handleCreateCustomer() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("name", ncName);
+      fd.set("phone", ncPhone);
+      fd.set("email", ncEmail);
+      fd.set("address", ncAddress);
+      fd.set("city", ncCity);
+      const res = await createQuickCustomer(fd);
+      if ("error" in res && res.error) { toast.error(res.error); return; }
+      const { id } = res as { id: string };
+      await selectCustomer({ id, name: ncName, phone: ncPhone || null });
+    });
+  }
 
   useEffect(() => {
     if (query.length < 2) { setResults([]); return; }
@@ -117,6 +160,7 @@ export function CalendarBookingDialog({
         <DialogHeader>
           <DialogTitle>
             {step === "customer" && "Új foglalás — ügyfél kiválasztása"}
+            {step === "new-customer" && "Új ügyfél felvétele"}
             {step === "setup" && `Új foglalás — ${customer?.name}`}
             {step === "slot" && `Időpont — ${customer?.name}`}
           </DialogTitle>
@@ -157,6 +201,72 @@ export function CalendarBookingDialog({
                 <Loader2 className="animate-spin text-muted-foreground" size={20} />
               </div>
             )}
+            <Button variant="outline" className="w-full gap-1.5" onClick={openNewCustomer}>
+              <UserPlus size={14} /> Új ügyfél felvétele
+            </Button>
+          </div>
+        )}
+
+        {step === "new-customer" && (
+          <div className="space-y-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Név *</Label>
+              <Input value={ncName} onChange={e => setNcName(e.target.value)} placeholder="Kovács János" autoFocus />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-xs">Telefonszám</Label>
+                <Input value={ncPhone} onChange={e => setNcPhone(e.target.value)} placeholder="+36 30 000 0000" type="tel" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">E-mail</Label>
+                <Input value={ncEmail} onChange={e => setNcEmail(e.target.value)} placeholder="nev@email.hu" type="email" />
+              </div>
+            </div>
+            {phoneMatches.length > 0 && (
+              <div className="rounded-md border border-yellow-300 bg-yellow-50 dark:bg-yellow-950/30 dark:border-yellow-700 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-xs font-medium text-yellow-800 dark:text-yellow-300">
+                  <AlertTriangle size={13} />
+                  Úgy tűnik, ez az ügyfél már szerepel:
+                </div>
+                {phoneMatches.map(m => (
+                  <div key={m.id} className="flex items-center justify-between gap-2">
+                    <div>
+                      <span className="text-sm font-semibold">{m.name}</span>
+                      {m.phone && <span className="text-xs text-muted-foreground ml-1.5">{m.phone}</span>}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-xs shrink-0 border-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-900/40"
+                      onClick={() => selectCustomer({ id: m.id, name: m.name, phone: m.phone })}
+                    >
+                      Kiválasztom
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="space-y-1">
+              <Label className="text-xs">Cím *</Label>
+              <Input value={ncAddress} onChange={e => setNcAddress(e.target.value)} placeholder="Fő utca 1." />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Város</Label>
+              <Input value={ncCity} onChange={e => setNcCity(e.target.value)} placeholder="Budapest" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <Button variant="ghost" size="sm" onClick={() => setStep("customer")}>← Vissza</Button>
+              <Button
+                size="sm"
+                className="flex-1"
+                disabled={!ncName.trim() || !ncAddress.trim() || isPending}
+                onClick={handleCreateCustomer}
+              >
+                {isPending ? <Loader2 size={14} className="animate-spin mr-1" /> : null}
+                Ügyfél létrehozása →
+              </Button>
+            </div>
           </div>
         )}
 
